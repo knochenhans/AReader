@@ -1,0 +1,55 @@
+@font-face {
+  font-family: topaz;
+  src: url(Topaz_a1200_v1.0.ttf) format("truetype");
+}
+
+
+body {
+  background-color: rgb(170, 170, 170);
+  color: black;
+  /* white-space: pre-wrap; */
+  line-height: 150%;
+  font-family: topaz;
+}
+
+.u {
+  text-decoration: underline;
+}
+
+a {
+  text-decoration: none;
+  color: black;
+  border-top: 2px solid white;
+  border-right: 2px solid black;
+  border-bottom: 2px solid black;
+  border-left: 2px solid white;
+}
+
+a:visited,
+a:focus {
+  color: white;
+  background-color: #5078A0;
+}
+
+.fg.highlight {
+  color: white;
+}
+
+.fg.shine {
+  color: white;
+}
+
+.fg.shadow {}
+
+.fg.fill {
+  color: #5078A0;
+}
+
+.fg.filltext {}
+
+.bg.text {
+  color: rgb(170, 170, 170);
+  background-color: black;
+}
+
+p {}

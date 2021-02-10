@@ -15,21 +15,27 @@ temp_dir = tempfile.mkdtemp()
 
 class Node:
     def __init__(self):
+        self.subfolder = ""
         self.name = ""
         self.title = ""
         self.index = ""
         self.text = ""
-        self.subfolder = ""
+        self.next = ""
+        self.prev = ""
+        self.toc = ""
+        self.help = ""
 
 
 class Database:
     def __init__(self):
         self.database = ""
+        self.nodes = []
         self.master = ""
         self.VER = ""
         self.author = ""
         self.c = ""
-        self.nodes = []
+        self.help = ""
+        self.index = ""
 
     def find_node_by_path(self, path):
         node = None
@@ -47,45 +53,59 @@ def load_database(filename):
 
         for l, line in enumerate(input_file):
             if not in_node:
+                # Node
                 if l == 0:
-                    match = regex.match(r'@database (.*?)$', line,
+                    match = regex.match(r'@database \"?(.*?)\"?$', line,
                                         flags=regex.IGNORECASE)
                     if match:
-                        database.database = match.group(1).strip('\"')
+                        database.database = match.group(1)
                         continue
                 # else: not a guide file
 
-                match = regex.match(r'@master (.*?)$', line,
+                match = regex.match(r'@master \"?(.*?)\"?$', line,
                                     flags=regex.IGNORECASE)
                 if match:
-                    database.master = match.group(1).strip('\"')
+                    database.master = match.group(1)
                     continue
 
                 match = regex.match(
-                    r'@ver (.*?)$', line, flags=regex.IGNORECASE)
+                    r'@ver \"?(.*?)\"?$', line, flags=regex.IGNORECASE)
                 if match:
-                    database.VER = match.group(1).strip('\"')
+                    database.VER = match.group(1)
                     continue
 
-                match = regex.match(r'@author (.*?)$', line,
+                match = regex.match(r'@author \"?(.*?)\"?$', line,
                                     flags=regex.IGNORECASE)
                 if match:
-                    database.author = match.group(1).strip('\"')
+                    database.author = match.group(1)
                     continue
 
-                match = regex.match(r'@c (.*?)$', line,
+                match = regex.match(r'@c \"?(.*?)\"?$', line,
                                     flags=regex.IGNORECASE)
                 if match:
-                    database.c = match.group(1).strip('\"')
+                    database.c = match.group(1)
+                    continue
+
+                # TODO: implement beep
+                match = regex.match(r'@help \"?(.*?)\"?$', line,
+                                    flags=regex.IGNORECASE)
+                if match:
+                    database.help = match.group(1)
+                    continue
+
+                match = regex.match(r'@index \"?(.*?)\"?$', line,
+                                    flags=regex.IGNORECASE)
+                if match:
+                    database.index = match.group(1)
                     continue
 
                 # Node
-                match = regex.match(r'@node (.*?) (.*?)$', line,
+                match = regex.match(r'@node \"?(.*?)\"? \"?(.*?)\"?$', line,
                                     flags=regex.IGNORECASE)
                 if match:
                     node = Node()
-                    node.name = match.group(1).strip('\"')
-                    node.title = match.group(2).strip('\"')
+                    node.name = match.group(1)
+                    node.title = match.group(2)
                     database.nodes.append(node)
                     in_node = True
                     continue
@@ -97,32 +117,93 @@ def load_database(filename):
                     continue
 
                 match = regex.match(
-                    r'@index (.*?)$', line, flags=regex.IGNORECASE)
+                    r'@index \"?(.*?)\"?$', line, flags=regex.IGNORECASE)
                 if match:
-                    database.nodes[-1].index = match.group(1).strip('\"')
+                    database.nodes[-1].index = match.group(1)
                     continue
 
-                match = regex.search(
-                    r'@{(.*?) link (.*?)\s*?([0-9]+)?}', line, flags=regex.IGNORECASE)
+                match = regex.match(
+                    r'@next \"?(.*?)\"?$', line, flags=regex.IGNORECASE)
                 if match:
-                    link_path = match.group(2).strip('\"')
-                    link_line = 0
+                    database.nodes[-1].next = match.group(1)
+                    continue
 
-                    if len(match.groups()) == 3:
-                        link_line = match.group(3)
+                match = regex.match(
+                    r'@prev \"?(.*?)\"?$', line, flags=regex.IGNORECASE)
+                if match:
+                    database.nodes[-1].prev = match.group(1)
+                    continue
 
-                    line = line[:match.start()] + '<a href="" data-path="' + link_path + '" data-line="' + str(
-                        link_line) + '">' + match.group(1).strip('\"') + '</a>' + line[match.end():]
+                match = regex.match(
+                    r'@toc \"?(.*?)\"?$', line, flags=regex.IGNORECASE)
+                if match:
+                    database.nodes[-1].toc = match.group(1)
+                    continue
 
-                line = regex.sub(r'@{b}', '<b>', line,
+                match = regex.match(
+                    r'@help \"?(.*?)\"?$', line, flags=regex.IGNORECASE)
+                if match:
+                    database.nodes[-1].help = match.group(1)
+                    continue
+
+                match = regex.match(
+                    r'@\{\"?(.*?)\"? quit\}$', line, flags=regex.IGNORECASE)
+                if match:
+                    # TODO: Implement quit button
+                    # TODO: replace!
+                    continue
+
+                match = regex.match(
+                    r'@\{\"?(.*?)\"? close\}$', line, flags=regex.IGNORECASE)
+                if match:
+                    # TODO: Implement quit button
+                    # TODO: replace!
+                    continue
+                
+                match = regex.match(
+                    r'@\{\"?Beep\"? beep\}$', line, flags=regex.IGNORECASE)
+                if match:
+                    # TODO: Implement beep button
+                    # TODO: replace!
+                    continue
+
+                line = regex.sub(r'@\{\"?(.*?)\"? link \"?(.*?)\"?\s*?\"?([0-9]+)\"?\}', r'<a href="" data-path="\2" data-line="\3">\1</a>', line,
                                  flags=regex.IGNORECASE)
-                line = regex.sub(r'@{ub}', '</b>', line,
+
+                line = regex.sub(r'@\{\"?(.*?)\"? link \"?(.*?)\"?\}', r'<a href="" data-path="\2" data-line="0">\1</a>', line,
                                  flags=regex.IGNORECASE)
+
+                line = regex.sub(r'@\{b\}', '<b>', line,
+                                 flags=regex.IGNORECASE)
+                line = regex.sub(r'@\{ub\}', '</b>', line,
+                                 flags=regex.IGNORECASE)
+
+                line = regex.sub(r'@\{i\}', '<i>', line,
+                                 flags=regex.IGNORECASE)
+                line = regex.sub(r'@\{ui\}', '</i>', line,
+                                 flags=regex.IGNORECASE)
+
+                line = regex.sub(r'@\{u\}', '<span class="u">', line,
+                                 flags=regex.IGNORECASE)
+                line = regex.sub(r'@\{uu\}', '</u>', line,
+                                 flags=regex.IGNORECASE)
+
+                # TODO: "This command is affected by the tab and settabs commands."
+                line = regex.sub(r'@\{tab\}', '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;', line,
+                                 flags=regex.IGNORECASE)
+
+                # Should actually scan for the next fg command and set spans accordingly
+                line = regex.sub(r'@\{fg highlight\}(.*?)@\{fg text\}', r'<span class="fg highlight">\1</span>', line,
+                                 flags=regex.IGNORECASE)
+
+                line = regex.sub(r'@\{line\}', '\n', line)
+
+                line = regex.sub(r'@\{line\}', '\n', line)
 
                 line = regex.sub(r'\n', '<br>', line)
 
                 # Replace spaces with protected spaces, only outside of tags
-                line = regex.sub(r'(?<!<[^>]*) ', '&nbsp;', line)
+                line = regex.sub(r'@\{amigaguide\}', '<b>Amigaguide(R)</b>', line)
 
                 database.nodes[-1].text += line
 
@@ -147,7 +228,8 @@ def node_to_html(node):
                 document.querySelectorAll('a').forEach(item => {
                     item.addEventListener('click', event => {
                         // Send JSON message to application
-                        window.webkit.messageHandlers.signal.postMessage({"path": item.dataset.path, "line": item.dataset.line});
+                        window.webkit.messageHandlers.signal.postMessage(
+                            {"path": item.dataset.path, "line": item.dataset.line});
 
                         // Keep href from being parsed
                         return false;
@@ -164,17 +246,16 @@ def link_receiver(user_content_manager, javascript_result):
 
 
 class Window(Gtk.Window):
-    def __init__(self, webview):
+    def __init__(self):
         Gtk.Window.__init__(self, title="Dialog Example")
-
-        copyfile('style.css', temp_dir + '/style.css')
-        copyfile('Topaz_a1200_v1.0.ttf', temp_dir + '/Topaz_a1200_v1.0.ttf')
 
         self.set_default_size(800, 600)
         self.connect("destroy", Gtk.main_quit)
         scrolled_window = Gtk.ScrolledWindow()
 
-        content_manager = webview.get_user_content_manager()
+        self.webview = WebKit2.WebView()
+
+        content_manager = self.webview.get_user_content_manager()
 
         with open('style.css', 'r') as s:
             style = WebKit2.UserStyleSheet(s.read(), 0, 0)
@@ -185,6 +266,44 @@ class Window(Gtk.Window):
 
         content_manager.connect(
             "script-message-received::signal", link_receiver)
+
+        # GUI
+
+        vbox = Gtk.VBox()
+        self.add(vbox)
+
+        button_box = Gtk.HBox()
+
+        self.contents_btn = Gtk.Button(label="Contents")
+        self.index_btn = Gtk.Button(label="Index")
+        self.help_btn = Gtk.Button(label="Help")
+        self.retrace_btn = Gtk.Button(label="Retrace")
+        self.browse_prev_btn = Gtk.Button(label="Browse <")
+        self.browse_next_btn = Gtk.Button(label="Browse >")
+
+        self.contents_btn.connect("clicked", self.on_click_contents_btn)
+        self.index_btn.connect("clicked", self.on_click_index_btn)
+        self.help_btn.connect("clicked", self.on_click_help_btn)
+        self.retrace_btn.connect("clicked", self.on_click_retrace_btn)
+        self.browse_prev_btn.connect("clicked", self.on_click_browse_prev_btn)
+        self.browse_next_btn.connect("clicked", self.on_click_browse_next_btn)
+
+        button_box.pack_start(self.contents_btn, True, True, 0)
+        button_box.pack_start(self.index_btn, True, True, 0)
+        button_box.pack_start(self.help_btn, True, True, 0)
+        button_box.pack_start(self.retrace_btn, True, True, 0)
+        button_box.pack_start(self.browse_prev_btn, True, True, 0)
+        button_box.pack_start(self.browse_next_btn, True, True, 0)
+
+        vbox.pack_start(button_box, False, False, 0)
+        vbox.pack_start(scrolled_window, True, True, 0)
+
+        self.contents_btn.set_sensitive(False)
+        self.index_btn.set_sensitive(False)
+        self.help_btn.set_sensitive(False)
+        self.retrace_btn.set_sensitive(False)
+        self.browse_prev_btn.set_sensitive(False)
+        self.browse_next_btn.set_sensitive(False)
 
         # Load File
 
@@ -197,6 +316,13 @@ class Window(Gtk.Window):
             Gtk.ResponseType.OK,
         )
 
+        # copyfile('style.css', temp_dir + '/style.css')
+        # copyfile('Topaz_a1200_v1.0.ttf', temp_dir + '/Topaz_a1200_v1.0.ttf')
+        copyfile('topaz_a1200_v1.0-webfont.woff2',
+                 temp_dir + '/topaz_a1200_v1.0-webfont.woff2')
+        copyfile('topaz_a1200_v1.0-webfont.woff',
+                 temp_dir + '/topaz_a1200_v1.0-webfont.woff')
+
         filter_any = Gtk.FileFilter()
         filter_any.set_name("AmigaGuide files")
         filter_any.add_pattern("*.guide")
@@ -208,23 +334,110 @@ class Window(Gtk.Window):
             filename = dialog.get_filename()
             dialog.destroy()
 
+        self.history = []
+
         self.root = filename[:filename.rfind('/')]
 
         self.database = load_database(filename)
 
-        self.load_node(self.database.nodes[0])
+        self.current_node = self.database.nodes[0]
 
-        scrolled_window.add(webview)
-        self.add(scrolled_window)
+        self.load_node(node=self.database.nodes[0], retrace=False)
 
-    def load_node(self, node, line=0):
+        scrolled_window.add(self.webview)
+
+    def on_click_contents_btn(self, button):
+        self.load_node(node=self.database.nodes[0], retrace=True)
+
+    def on_click_index_btn(self, button):
+        if self.current_node.index:
+            self.load_node_by_path(self.current_node.index)
+
+        if self.database.index:
+            self.load_node_by_path(self.database.index)
+
+    def on_click_help_btn(self, button):
+        if self.current_node.help:
+            self.load_node_by_path(self.current_node.help)
+
+        if self.database.help:
+            self.load_node_by_path(self.database.help)
+
+    def on_click_retrace_btn(self, button):
+        if len(self.history) > 0:
+            self.load_node(self.history.pop(), retrace=False)
+
+    def on_click_browse_prev_btn(self, button):
+        if self.current_node.prev:
+            self.load_node_by_path(self.current_node.prev)
+
+    def on_click_browse_next_btn(self, button):
+        if self.current_node.next:
+            self.load_node_by_path(self.current_node.next)
+
+    def load_node(self, node, line=0, retrace=True):
         if not os.path.isfile(temp_dir + '/' + node.subfolder + node.name):
             with open(temp_dir + '/' + node.subfolder + node.name, 'w') as output_file:
                 output_file.write(node_to_html(node))
                 output_file.close()
 
-        webview.load_uri('file://' + temp_dir + '/' +
-                         node.subfolder + node.name)
+        self.webview.load_uri('file://' + temp_dir + '/' +
+                              node.subfolder + node.name)
+
+        self.set_title(node.name)
+
+        if node.next:
+            next = True
+        else:
+            next = False
+
+        self.browse_next_btn.set_sensitive(next)
+
+        if node.prev:
+            prev = True
+        else:
+            prev = False
+
+        self.browse_prev_btn.set_sensitive(prev)
+
+        if node.toc:
+            toc = True
+        else:
+            toc = False
+
+        self.contents_btn.set_sensitive(toc)
+
+        if node.help:
+            help = True
+        else:
+            if self.database.help:
+                help = True
+            else:
+                help = False
+
+        self.contents_btn.set_sensitive(help)
+
+        if node.index:
+            index = True
+        else:
+            if self.database.index:
+                index = True
+            else:
+                index = False
+
+        self.contents_btn.set_sensitive(index)
+
+        if retrace:
+            self.history.append(self.current_node)
+
+        self.current_node = node
+
+        if len(self.history) > 0:
+            history = True
+        else:
+            history = False
+
+        self.retrace_btn.set_sensitive(history)
 
     def load_node_by_path(self, path, line=0):
         # Check if path is another guide file
@@ -238,7 +451,6 @@ class Window(Gtk.Window):
             self.load_node(node, line)
 
 
-webview = WebKit2.WebView()
-window = Window(webview)
+window = Window()
 window.show_all()
 Gtk.main()

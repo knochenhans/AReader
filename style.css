@@ -1,6 +1,9 @@
 @font-face {
-  font-family: topaz;
-  src: url(Topaz_a1200_v1.0.ttf) format("truetype");
+  font-family: 'topaz';
+  src: url('topaz_a1200_v1.0-webfont.woff2') format('woff2'),
+    url('topaz_a1200_v1.0-webfont.woff') format('woff');
+  font-weight: normal;
+  font-style: normal;
 }
 
 
@@ -9,7 +12,7 @@ body {
   color: black;
   /* white-space: pre-wrap; */
   line-height: 150%;
-  font-family: topaz;
+  font-family: 'topaz';
 }
 
 .u {
@@ -23,6 +26,8 @@ a {
   border-right: 2px solid black;
   border-bottom: 2px solid black;
   border-left: 2px solid white;
+  padding-left: 2px;
+  padding-right: 2px;
 }
 
 a:visited,
@@ -52,3 +57,5 @@ a:focus {
 }
 
 p {}
+
+b {}

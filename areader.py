@@ -3,7 +3,6 @@ import regex
 import json
 import os.path
 from shutil import copyfile
-from airium import Airium
 from gi.repository import Gtk, WebKit2
 import gi
 gi.require_version('Gtk', '3.0')
@@ -11,6 +10,10 @@ gi.require_version('WebKit2', '4.0')
 
 temp = tempfile.TemporaryFile()
 temp_dir = tempfile.mkdtemp()
+
+fonts = {
+    "helvetica.font": "helvetica",
+}
 
 
 class Node:
@@ -36,6 +39,10 @@ class Database:
         self.c = ""
         self.help = ""
         self.index = ""
+        self.tab = 8
+        self.settabs = []
+        self.font = "Topaz"
+        self.font_size = 16
 
     def find_node_by_path(self, path):
         node = None
@@ -53,7 +60,7 @@ def load_database(filename):
 
         for l, line in enumerate(input_file):
             if not in_node:
-                # Node
+                # Database
                 if l == 0:
                     match = regex.match(r'@database \"?(.*?)\"?$', line,
                                         flags=regex.IGNORECASE)
@@ -62,6 +69,7 @@ def load_database(filename):
                         continue
                 # else: not a guide file
 
+                # TODO: Do something with master information
                 match = regex.match(r'@master \"?(.*?)\"?$', line,
                                     flags=regex.IGNORECASE)
                 if match:
@@ -86,7 +94,6 @@ def load_database(filename):
                     database.c = match.group(1)
                     continue
 
-                # TODO: implement beep
                 match = regex.match(r'@help \"?(.*?)\"?$', line,
                                     flags=regex.IGNORECASE)
                 if match:
@@ -97,6 +104,27 @@ def load_database(filename):
                                     flags=regex.IGNORECASE)
                 if match:
                     database.index = match.group(1)
+                    continue
+
+                match = regex.match(r'@tab ([0-9])$', line,
+                                    flags=regex.IGNORECASE)
+                if match:
+                    database.tab = int(match.group(1))
+                    continue
+
+                # TODO: Do something with the data stored here
+                match = regex.match(r'@\{settabs (.*?)\}', line,
+                                    flags=regex.IGNORECASE)
+                if match:
+                    for m in regex.findall(r'([0-9]+)', match.group(1)):
+                        database.settabs.append(m)
+                    continue
+
+                match = regex.match(r'@font \"?(.*?)\"? ([0-9]+)$', line,
+                                    flags=regex.IGNORECASE)
+                if match:
+                    database.font = fonts[match.group(1)]
+                    database.font_size = int(match.group(2))
                     continue
 
                 # Node
@@ -146,31 +174,26 @@ def load_database(filename):
                     database.nodes[-1].help = match.group(1)
                     continue
 
-                match = regex.match(
-                    r'@\{\"?(.*?)\"? quit\}$', line, flags=regex.IGNORECASE)
-                if match:
-                    # TODO: Implement quit button
-                    # TODO: replace!
-                    continue
+                # Text
 
-                match = regex.match(
-                    r'@\{\"?(.*?)\"? close\}$', line, flags=regex.IGNORECASE)
-                if match:
-                    # TODO: Implement quit button
-                    # TODO: replace!
-                    continue
-                
-                match = regex.match(
-                    r'@\{\"?Beep\"? beep\}$', line, flags=regex.IGNORECASE)
-                if match:
-                    # TODO: Implement beep button
-                    # TODO: replace!
-                    continue
+                # TODO: Implement quit script
+                line = regex.sub(r'@\{\"?(.*?)\"? quit\}', r'<a href="javascript:quit()">\1</a>',
+                                 line, flags=regex.IGNORECASE)
+
+                line = regex.sub(r'@\{\"?(.*?)\"? close\}', r'<a href="javascript:quit()">\1</a>',
+                                 line, flags=regex.IGNORECASE)
+
+                line = regex.sub(r'@\{\"?(.*?)\"? beep\s*?\"?([0-9]+)\"?\}', r'<a href="javascript:beep()">\1</a>', line,
+                                 flags=regex.IGNORECASE)
 
                 line = regex.sub(r'@\{\"?(.*?)\"? link \"?(.*?)\"?\s*?\"?([0-9]+)\"?\}', r'<a href="" data-path="\2" data-line="\3">\1</a>', line,
                                  flags=regex.IGNORECASE)
 
                 line = regex.sub(r'@\{\"?(.*?)\"? link \"?(.*?)\"?\}', r'<a href="" data-path="\2" data-line="0">\1</a>', line,
+                                 flags=regex.IGNORECASE)
+
+                # TODO: Do something with system commands
+                line = regex.sub(r'@\{\"?(.*?)\"? system \"?(.*?)\"?\}', r'<a href="">\1</a>', line,
                                  flags=regex.IGNORECASE)
 
                 line = regex.sub(r'@\{b\}', '<b>', line,
@@ -185,11 +208,11 @@ def load_database(filename):
 
                 line = regex.sub(r'@\{u\}', '<span class="u">', line,
                                  flags=regex.IGNORECASE)
-                line = regex.sub(r'@\{uu\}', '</u>', line,
+                line = regex.sub(r'@\{uu\}', '</span>', line,
                                  flags=regex.IGNORECASE)
 
                 # TODO: "This command is affected by the tab and settabs commands."
-                line = regex.sub(r'@\{tab\}', '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;', line,
+                line = regex.sub(r'@\{tab\}', '        ', line,
                                  flags=regex.IGNORECASE)
 
                 # Should actually scan for the next fg command and set spans accordingly
@@ -198,12 +221,11 @@ def load_database(filename):
 
                 line = regex.sub(r'@\{line\}', '\n', line)
 
-                line = regex.sub(r'@\{line\}', '\n', line)
-
                 line = regex.sub(r'\n', '<br>', line)
 
                 # Replace spaces with protected spaces, only outside of tags
-                line = regex.sub(r'@\{amigaguide\}', '<b>Amigaguide(R)</b>', line)
+                line = regex.sub(r'@\{amigaguide\}',
+                                 '<b>Amigaguide(R)</b>', line)
 
                 database.nodes[-1].text += line
 
@@ -211,32 +233,11 @@ def load_database(filename):
 
 
 def node_to_html(node):
+    html = '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8" /><title>' + \
+        node.title + '</title></head><body><p id="' + node.name + \
+        '" class="node ' + node.name + '">' + node.text + '</p></body></html>'
 
-    html = Airium()
-
-    html('<!DOCTYPE html>')
-    with html.html(lang="en"):
-        with html.head():
-            html.meta(charset="utf-8")
-            html.title(_t=node.title)
-
-        with html.body():
-            with html.p(id=node.name, klass=node.name):
-                html(node.text)
-            with html.script(type="text/javascript"):
-                html('''
-                document.querySelectorAll('a').forEach(item => {
-                    item.addEventListener('click', event => {
-                        // Send JSON message to application
-                        window.webkit.messageHandlers.signal.postMessage(
-                            {"path": item.dataset.path, "line": item.dataset.line});
-
-                        // Keep href from being parsed
-                        return false;
-                    })
-                })
-                ''')
-    return str(html)
+    return html
 
 
 def link_receiver(user_content_manager, javascript_result):
@@ -247,7 +248,7 @@ def link_receiver(user_content_manager, javascript_result):
 
 class Window(Gtk.Window):
     def __init__(self):
-        Gtk.Window.__init__(self, title="Dialog Example")
+        Gtk.Window.__init__(self, title="AReader")
 
         self.set_default_size(800, 600)
         self.connect("destroy", Gtk.main_quit)
@@ -257,17 +258,27 @@ class Window(Gtk.Window):
 
         content_manager = self.webview.get_user_content_manager()
 
-        with open('style.css', 'r') as s:
-            style = WebKit2.UserStyleSheet(s.read(), 0, 0)
+        # with open('normalize.css', 'r') as style:
+        #     content_manager.add_style_sheet(WebKit2.UserStyleSheet(style.read(
+        #     ), injected_frames=WebKit2.UserContentInjectedFrames.ALL_FRAMES, level=WebKit2.UserStyleLevel.USER))
+        # style.close()
 
-            content_manager.add_style_sheet(style)
+        with open('style.css', 'r') as style:
+            content_manager.add_style_sheet(WebKit2.UserStyleSheet(style.read(
+            ), injected_frames=WebKit2.UserContentInjectedFrames.ALL_FRAMES, level=WebKit2.UserStyleLevel.USER))
+        style.close()
+
+        with open('functions.js', 'r') as functions:
+            content_manager.add_script(WebKit2.UserScript(source=functions.read(
+            ), injected_frames=WebKit2.UserContentInjectedFrames.ALL_FRAMES, injection_time=WebKit2.UserScriptInjectionTime.END))
+        functions.close()
 
         content_manager.register_script_message_handler("signal")
 
         content_manager.connect(
             "script-message-received::signal", link_receiver)
 
-        # GUI
+        # Layout
 
         vbox = Gtk.VBox()
         self.add(vbox)
@@ -305,8 +316,33 @@ class Window(Gtk.Window):
         self.browse_prev_btn.set_sensitive(False)
         self.browse_next_btn.set_sensitive(False)
 
-        # Load File
+        filename = self.load_file()
 
+        copyfile('topaz_a1200_v1.0-webfont.woff2',
+                 temp_dir + '/topaz_a1200_v1.0-webfont.woff2')
+        copyfile('topaz_a1200_v1.0-webfont.woff',
+                 temp_dir + '/topaz_a1200_v1.0-webfont.woff')
+        copyfile('cursor_select.cur',
+                 temp_dir + '/cursor_select.cur')
+        copyfile('cursor_link.cur',
+                 temp_dir + '/cursor_link.cur')
+        copyfile('beep.mp3',
+                 temp_dir + '/beep.mp3')
+
+        self.history = []
+
+        if filename:
+            self.root = filename[:filename.rfind('/')]
+
+            self.database = load_database(filename)
+
+        self.current_node = self.database.nodes[0]
+
+        self.load_node(node=self.database.nodes[0], retrace=False)
+
+        scrolled_window.add(self.webview)
+
+    def load_file(self):
         dialog = Gtk.FileChooserDialog(
             title="Please choose a file", parent=self, action=Gtk.FileChooserAction.OPEN)
         dialog.add_buttons(
@@ -315,13 +351,6 @@ class Window(Gtk.Window):
             Gtk.STOCK_OPEN,
             Gtk.ResponseType.OK,
         )
-
-        # copyfile('style.css', temp_dir + '/style.css')
-        # copyfile('Topaz_a1200_v1.0.ttf', temp_dir + '/Topaz_a1200_v1.0.ttf')
-        copyfile('topaz_a1200_v1.0-webfont.woff2',
-                 temp_dir + '/topaz_a1200_v1.0-webfont.woff2')
-        copyfile('topaz_a1200_v1.0-webfont.woff',
-                 temp_dir + '/topaz_a1200_v1.0-webfont.woff')
 
         filter_any = Gtk.FileFilter()
         filter_any.set_name("AmigaGuide files")
@@ -333,18 +362,7 @@ class Window(Gtk.Window):
         if dialog.run() == Gtk.ResponseType.OK:
             filename = dialog.get_filename()
             dialog.destroy()
-
-        self.history = []
-
-        self.root = filename[:filename.rfind('/')]
-
-        self.database = load_database(filename)
-
-        self.current_node = self.database.nodes[0]
-
-        self.load_node(node=self.database.nodes[0], retrace=False)
-
-        scrolled_window.add(self.webview)
+        return filename
 
     def on_click_contents_btn(self, button):
         self.load_node(node=self.database.nodes[0], retrace=True)
@@ -385,6 +403,14 @@ class Window(Gtk.Window):
                               node.subfolder + node.name)
 
         self.set_title(node.name)
+
+        self.webview.get_user_content_manager().add_style_sheet(WebKit2.UserStyleSheet('''
+        html {
+            font-family: ''' + self.database.font + ''';
+            font-size: ''' + str(self.database.font_size) + '''px;
+        }''', injected_frames=WebKit2.UserContentInjectedFrames.ALL_FRAMES, level=WebKit2.UserStyleLevel.USER))
+
+        # Buttons
 
         if node.next:
             next = True

@@ -1,14 +1,14 @@
 @font-face {
   font-family: 'topaz';
-  src: url('topaz_a1200_v1.0-webfont.woff2') format('woff2'),
-    url('topaz_a1200_v1.0-webfont.woff') format('woff');
+  src: url('../topaz_a1200_v1.0-webfont.woff2') format('woff2'),
+    url('../CyberBlanker.guide/topaz_a1200_v1.0-webfont.woff') format('woff');
 }
 
 body {
   background-color: rgb(170, 170, 170);
   color: black;
   line-height: 150%;
-  cursor: url('cursor_select.cur'), auto;
+  cursor: url('../cursor_select.cur'), auto;
 }
 
 .u {
@@ -24,7 +24,7 @@ a {
   border-left: 2px solid white;
   padding-left: 2px;
   padding-right: 2px;
-  cursor: url('cursor_select.cur'), auto;
+  cursor: url('../cursor_select.cur'), auto;
 }
 
 a:visited,
@@ -36,25 +36,54 @@ a:focus {
   color: white;
 }
 
+.fg.back {
+  color: rgb(170, 170, 170);
+}
+
 .fg.shine {
   color: white;
 }
 
-.fg.shadow {}
+.fg.shadow {
+  color: black;
+}
 
 .fg.fill {
   color: #5078A0;
 }
 
-.fg.filltext {}
+.fg.filltext {
+  color: black;
+}
 
 .bg.text {
-  color: rgb(170, 170, 170);
   background-color: black;
 }
 
-p.node {
-  white-space: pre;
+.bg.highlight {
+  background-color: white;
 }
+
+.fg.back {
+  background-color: rgb(170, 170, 170);
+}
+
+.bg.shine {
+  background-color: white;
+}
+
+.bg.shadow {
+  background-color: black;
+}
+
+.bg.fill {
+  background-color: #5078A0;
+}
+
+.bg.filltext {
+  background-color: black;
+}
+
+p.node {}
 
 b {}

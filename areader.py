@@ -1,3 +1,4 @@
+from os import mkdir, replace
 import tempfile
 import regex
 import json
@@ -5,6 +6,7 @@ import os.path
 from shutil import copyfile
 from gi.repository import Gtk, WebKit2
 import gi
+from regex.regex import findall
 gi.require_version('Gtk', '3.0')
 gi.require_version('WebKit2', '4.0')
 
@@ -17,227 +19,295 @@ fonts = {
 
 
 class Node:
-    def __init__(self):
-        self.subfolder = ""
+    def __init__(self, database):
+        self.database = database
         self.name = ""
-        self.title = ""
-        self.index = ""
         self.text = ""
         self.next = ""
-        self.prev = ""
-        self.toc = ""
+        self.embed = ""
+        self.font = ""
+        self.font_size = 0
         self.help = ""
+        self.index = ""
+        self.keywords = []
+        self.macro = ""
+        self.onclose = ""
+        self.onopen = ""
+        self.prev = ""
+        self.proportional = False
+        self.smartwrap = False
+        self.tab = []
+        self.title = ""
+        self.toc = ""
+        self.wordwrap = False
+
+    def write_as_html(self, path):
+        html = '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8" /><title>' + \
+            self.title + '</title></head><body><p id="' + self.name + \
+            '" class="node ' + self.name + '">' + self.text + '</p></body></html>'
+
+        # Write as html files (we need to make sure to use the right extension, otherwise webkit.load_uri() sometimes reads them as raw files)
+        with open(temp_dir + '/' + path + self.name + '.html', 'w') as output_file:
+            output_file.write(html)
+            output_file.close()
 
 
 class Database:
     def __init__(self):
-        self.database = ""
-        self.nodes = []
-        self.master = ""
-        self.VER = ""
-        self.author = ""
+        self.ver = ""
         self.c = ""
-        self.help = ""
-        self.index = ""
-        self.tab = 8
-        self.settabs = []
+        self.author = ""
+        self.database = ""
         self.font = "Topaz"
         self.font_size = 16
+        self.height = 0
+        self.help = ""
+        self.index = ""
+        self.macro = ""
+        self.master = ""
+        self.onclose = ""
+        self.onopen = ""
+        self.remark = ""
+        self.smartwrap = False
+        self.tab = []
+        self.width = 100
+        self.wordwrap = False
+        self.xref = ""
+        #self.settabs = []
+        self.nodes = []
+
+        # Status variable for node parser
+        self.in_node = False
 
     def find_node_by_path(self, path):
         node = None
         for node in self.nodes:
-            if node.subfolder + node.name == path:
+            if node.name == path:
                 return node
         return node
 
+    def breakup_command(self, string):
+        # Break up command strings into chunks marked by either whitespaces or quotation marks (including whitespaces)
+        chunks = []
 
-def load_database(filename):
-    database = Database()
+        open = False
 
-    with open(filename, 'r', encoding='cp1252') as input_file:
-        in_node = False
+        i = 0
 
-        for l, line in enumerate(input_file):
-            if not in_node:
-                # Database
-                if l == 0:
-                    match = regex.match(r'@database \"?(.*?)\"?$', line,
-                                        flags=regex.IGNORECASE)
-                    if match:
-                        database.database = match.group(1)
-                        continue
-                # else: not a guide file
-
-                # TODO: Do something with master information
-                match = regex.match(r'@master \"?(.*?)\"?$', line,
-                                    flags=regex.IGNORECASE)
-                if match:
-                    database.master = match.group(1)
-                    continue
-
-                match = regex.match(
-                    r'@ver \"?(.*?)\"?$', line, flags=regex.IGNORECASE)
-                if match:
-                    database.VER = match.group(1)
-                    continue
-
-                match = regex.match(r'@author \"?(.*?)\"?$', line,
-                                    flags=regex.IGNORECASE)
-                if match:
-                    database.author = match.group(1)
-                    continue
-
-                match = regex.match(r'@c \"?(.*?)\"?$', line,
-                                    flags=regex.IGNORECASE)
-                if match:
-                    database.c = match.group(1)
-                    continue
-
-                match = regex.match(r'@help \"?(.*?)\"?$', line,
-                                    flags=regex.IGNORECASE)
-                if match:
-                    database.help = match.group(1)
-                    continue
-
-                match = regex.match(r'@index \"?(.*?)\"?$', line,
-                                    flags=regex.IGNORECASE)
-                if match:
-                    database.index = match.group(1)
-                    continue
-
-                match = regex.match(r'@tab ([0-9])$', line,
-                                    flags=regex.IGNORECASE)
-                if match:
-                    database.tab = int(match.group(1))
-                    continue
-
-                # TODO: Do something with the data stored here
-                match = regex.match(r'@\{settabs (.*?)\}', line,
-                                    flags=regex.IGNORECASE)
-                if match:
-                    for m in regex.findall(r'([0-9]+)', match.group(1)):
-                        database.settabs.append(m)
-                    continue
-
-                match = regex.match(r'@font \"?(.*?)\"? ([0-9]+)$', line,
-                                    flags=regex.IGNORECASE)
-                if match:
-                    database.font = fonts[match.group(1)]
-                    database.font_size = int(match.group(2))
-                    continue
-
-                # Node
-                match = regex.match(r'@node \"?(.*?)\"? \"?(.*?)\"?$', line,
-                                    flags=regex.IGNORECASE)
-                if match:
-                    node = Node()
-                    node.name = match.group(1)
-                    node.title = match.group(2)
-                    database.nodes.append(node)
-                    in_node = True
-                    continue
+        while i >= 0 and i < len(string):
+            if string[i] == " ":
+                if not open:
+                    if i == 0:
+                        # Remove starting whitespaces
+                        string = string[i + 1:]
+                    else:
+                        # Only break up if this string is not in quotation marks
+                        chunks.append(string[:i])
+                        string = string[i + 1:]
+                        i = 0
+                else:
+                    i = i + 1
+            elif string[i] == "\"":
+                if not open:
+                    # Quotation mark found, stop processing until ending mark is found
+                    open = True
+                    string = string[1:]
+                else:
+                    # Ending mark found, save complete string up to this point
+                    open = False
+                    chunks.append(string[:i])
+                    string = string[i + 1:]
+                i = 0
             else:
-                match = regex.match(r'@endnode', line,
-                                    flags=regex.IGNORECASE)
+                # Nothing found, next character
+                i = i + 1
+        # Append remaining string
+        if len(string) > 0:
+            chunks.append(string)
+        return chunks
+
+    def concat_chunks(self, chunks, start=1):
+        # Concatenate chunks for line commands
+        # TODO: Find a way to keep getting line commands getting broken up
+        string = ""
+        for i, chunk in enumerate(chunks):
+            if i >= start:
+                string += chunk + " "
+        return string.strip()
+
+    def process_line_command(self, string):
+        chunks = self.breakup_command(string)
+
+        if chunks[0].lower() == 'database':
+            self.database = chunks[1]
+
+        if chunks[0].lower() == 'master':
+            self.master = chunks[1]
+
+        if chunks[0].lower() == '$ver:':
+            self.ver = self.concat_chunks(chunks)
+
+        if chunks[0].lower() == 'author':
+            self.author = self.concat_chunks(chunks)
+
+        if chunks[0].lower() == '(c)':
+            self.c = self.concat_chunks(chunks)
+
+        if chunks[0].lower() == 'help':
+            self.help = chunks[1]
+
+        if chunks[0].lower() == 'index':
+            self.index = chunks[1]
+
+        if chunks[0].lower() == 'tab':
+            self.tab = int(chunks[1])
+
+        if chunks[0].lower() == 'font':
+            self.font = fonts[chunks[1]]
+            self.font_size = int(chunks[2])
+
+        if chunks[0].lower() == 'rem' or chunks[0].lower() == 'remark':
+            self.remark = chunks[1]
+
+        if chunks[0].lower() == 'width':
+            self.width = int(chunks[1])
+
+        if chunks[0].lower() == 'wordwrap':
+            self.wordwrap = True
+
+        if chunks[0].lower() == 'node':
+            node = Node(self)
+            node.name = chunks[1]
+            if len(chunks) > 2:
+                node.title = chunks[2]
+            else:
+                node.title = node.name
+            self.nodes.append(node)
+            self.in_node = True
+
+        if self.in_node:
+            if chunks[0].lower() == 'index':
+                self.nodes[-1].index = chunks[1]
+            if chunks[0].lower() == 'next':
+                self.nodes[-1].next = chunks[1]
+            if chunks[0].lower() == 'prev':
+                self.nodes[-1].prev = chunks[1]
+            if chunks[0].lower() == 'toc':
+                self.nodes[-1].toc = chunks[1]
+            if chunks[0].lower() == 'help':
+                self.nodes[-1].help = chunks[1]
+            if chunks[0].lower() == 'endnode':
+                self.in_node = False
+
+    def process_inline_command(self, string):
+        chunks = self.breakup_command(string)
+
+        output = ""
+
+        if len(chunks) == 1:
+            if chunks[0].lower() == 'u':
+                output = '<span class="u">'
+            if chunks[0].lower() == 'uu':
+                output = '</span>'
+            if chunks[0].lower() == 'b':
+                output = '<b>'
+            if chunks[0].lower() == 'ub':
+                output = '</b>'
+            if chunks[0].lower() == 'i':
+                output = '<i>'
+            if chunks[0].lower() == 'ui':
+                output = '</i>'
+            if chunks[0].lower() == 'line':
+                output = '<br/>'
+            if chunks[0].lower() == 'amigaguide':
+                output = '<b>Amigaguide(R)</b>'
+        elif len(chunks) == 2:
+            # Should actually scan for the next fg command and set spans accordingly
+            if chunks[0].lower() == 'fg' or chunks[0].lower() == 'bg':
+                if chunks[1].lower() == 'highlight'\
+                        or chunks[1].lower() == 'shine'\
+                        or chunks[1].lower() == 'shadow'\
+                        or chunks[1].lower() == 'fill'\
+                        or chunks[1].lower() == 'filltext'\
+                        or chunks[1].lower() == 'back':
+                    output = '<span class="' + \
+                        chunks[0].lower() + ' ' + chunks[1].lower() + '">'
+                if chunks[1].lower() == 'text':
+                    output = '</span>'
+            # TODO: Implement quit script
+            if chunks[1].lower() == 'close' or chunks[1].lower() == 'quit':
+                output = '<a href="javascript:quit()">' + chunks[0] + '</a>'
+        elif len(chunks) >= 2:
+            if chunks[1].lower() == 'beep':
+                output = '<a href="javascript:beep()">' + \
+                    chunks[0] + '</a>'
+            # TODO: Do something with system commands
+            if chunks[1].lower() == 'system':
+                output = '<a href="">' + \
+                    chunks[0] + '</a>'
+            if chunks[1].lower() == 'link':
+                if len(chunks) > 3:
+                    line = int(chunks[3])
+                else:
+                    line = 0
+                output = '<a href="" data-path="' + \
+                    chunks[2] + '" data-line="' + \
+                    str(line) + '">' + chunks[0] + '</a>'
+
+        return output
+
+    def find_command(self, line):
+        i = 0
+        while i >= 0 and i < len(line):
+            # Check if there’s any @ in the text
+            i = line.find('@', i)
+            if i >= 0:
+                # Check if we need to ignore the command (lead by a "\")
+                if i > 0:
+                    if line.find('\\', i - 1) >= 0:
+                        i = i + 1
+                        continue
+
+                match = regex.match(r'@\{(.*?)\}', line[i:])
                 if match:
-                    in_node = False
-                    continue
+                    # Inline command, replace with tag and keep searching
+                    tag = self.process_inline_command(match.group(1))
+                    line = line[:i] + tag + line[i + match.end():]
+                    i += len(tag)
+                else:
+                    # Line command, process and delete line (or leave line alone if no command)
+                    match = regex.match(r'^\s*?@(.*?)$', line)
+                    if match:
+                        self.process_line_command(match.group(1))
+                        line = ""
+                    else:
+                        i = i + 1
+                        continue
+        return line
 
-                match = regex.match(
-                    r'@index \"?(.*?)\"?$', line, flags=regex.IGNORECASE)
-                if match:
-                    database.nodes[-1].index = match.group(1)
-                    continue
+    def load_from_file(self, filename):
 
-                match = regex.match(
-                    r'@next \"?(.*?)\"?$', line, flags=regex.IGNORECASE)
-                if match:
-                    database.nodes[-1].next = match.group(1)
-                    continue
+        # Load guide file, extract database and node information, create subfolder with html files for nodes
+        with open(filename, 'r', encoding='cp1252') as input_file:
+            in_node = False
 
-                match = regex.match(
-                    r'@prev \"?(.*?)\"?$', line, flags=regex.IGNORECASE)
-                if match:
-                    database.nodes[-1].prev = match.group(1)
-                    continue
+            for l, line in enumerate(input_file):
 
-                match = regex.match(
-                    r'@toc \"?(.*?)\"?$', line, flags=regex.IGNORECASE)
-                if match:
-                    database.nodes[-1].toc = match.group(1)
-                    continue
+                line = line.replace('<', '&lt;')
+                line = line.replace('>', '&gt;')
+                line = self.find_command(line)
+                line = line.replace('\@', '@')
 
-                match = regex.match(
-                    r'@help \"?(.*?)\"?$', line, flags=regex.IGNORECASE)
-                if match:
-                    database.nodes[-1].help = match.group(1)
-                    continue
+                # Replace in-nodes lines with tags
+                if self.in_node:
+                    self.nodes[-1].text += line
 
-                # Text
+            # Create subfolder for database files
+            mkdir(temp_dir + "/" + self.database)
 
-                # TODO: Implement quit script
-                line = regex.sub(r'@\{\"?(.*?)\"? quit\}', r'<a href="javascript:quit()">\1</a>',
-                                 line, flags=regex.IGNORECASE)
-
-                line = regex.sub(r'@\{\"?(.*?)\"? close\}', r'<a href="javascript:quit()">\1</a>',
-                                 line, flags=regex.IGNORECASE)
-
-                line = regex.sub(r'@\{\"?(.*?)\"? beep\s*?\"?([0-9]+)\"?\}', r'<a href="javascript:beep()">\1</a>', line,
-                                 flags=regex.IGNORECASE)
-
-                line = regex.sub(r'@\{\"?(.*?)\"? link \"?(.*?)\"?\s*?\"?([0-9]+)\"?\}', r'<a href="" data-path="\2" data-line="\3">\1</a>', line,
-                                 flags=regex.IGNORECASE)
-
-                line = regex.sub(r'@\{\"?(.*?)\"? link \"?(.*?)\"?\}', r'<a href="" data-path="\2" data-line="0">\1</a>', line,
-                                 flags=regex.IGNORECASE)
-
-                # TODO: Do something with system commands
-                line = regex.sub(r'@\{\"?(.*?)\"? system \"?(.*?)\"?\}', r'<a href="">\1</a>', line,
-                                 flags=regex.IGNORECASE)
-
-                line = regex.sub(r'@\{b\}', '<b>', line,
-                                 flags=regex.IGNORECASE)
-                line = regex.sub(r'@\{ub\}', '</b>', line,
-                                 flags=regex.IGNORECASE)
-
-                line = regex.sub(r'@\{i\}', '<i>', line,
-                                 flags=regex.IGNORECASE)
-                line = regex.sub(r'@\{ui\}', '</i>', line,
-                                 flags=regex.IGNORECASE)
-
-                line = regex.sub(r'@\{u\}', '<span class="u">', line,
-                                 flags=regex.IGNORECASE)
-                line = regex.sub(r'@\{uu\}', '</span>', line,
-                                 flags=regex.IGNORECASE)
-
-                # TODO: "This command is affected by the tab and settabs commands."
-                line = regex.sub(r'@\{tab\}', '        ', line,
-                                 flags=regex.IGNORECASE)
-
-                # Should actually scan for the next fg command and set spans accordingly
-                line = regex.sub(r'@\{fg highlight\}(.*?)@\{fg text\}', r'<span class="fg highlight">\1</span>', line,
-                                 flags=regex.IGNORECASE)
-
-                line = regex.sub(r'@\{line\}', '\n', line)
-
-                line = regex.sub(r'\n', '<br>', line)
-
-                # Replace spaces with protected spaces, only outside of tags
-                line = regex.sub(r'@\{amigaguide\}',
-                                 '<b>Amigaguide(R)</b>', line)
-
-                database.nodes[-1].text += line
-
-    return database
-
-
-def node_to_html(node):
-    html = '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8" /><title>' + \
-        node.title + '</title></head><body><p id="' + node.name + \
-        '" class="node ' + node.name + '">' + node.text + '</p></body></html>'
-
-    return html
+            # Write all nodes as html
+            for node in self.nodes:
+                node.write_as_html(self.database + "/")
 
 
 def link_receiver(user_content_manager, javascript_result):
@@ -250,11 +320,13 @@ class Window(Gtk.Window):
     def __init__(self):
         Gtk.Window.__init__(self, title="AReader")
 
-        self.set_default_size(800, 600)
+        self.set_default_size(675, 620)
         self.connect("destroy", Gtk.main_quit)
         scrolled_window = Gtk.ScrolledWindow()
 
         self.webview = WebKit2.WebView()
+
+        # Inject styles and functions
 
         content_manager = self.webview.get_user_content_manager()
 
@@ -273,12 +345,14 @@ class Window(Gtk.Window):
             ), injected_frames=WebKit2.UserContentInjectedFrames.ALL_FRAMES, injection_time=WebKit2.UserScriptInjectionTime.END))
         functions.close()
 
+        # Callback function for links to nodes (overriding html links)
+
         content_manager.register_script_message_handler("signal")
 
         content_manager.connect(
             "script-message-received::signal", link_receiver)
 
-        # Layout
+        # Setup Layout
 
         vbox = Gtk.VBox()
         self.add(vbox)
@@ -318,6 +392,8 @@ class Window(Gtk.Window):
 
         filename = self.load_file()
 
+        # Copy some needed files (fonts, cursors, beep sound)
+
         copyfile('topaz_a1200_v1.0-webfont.woff2',
                  temp_dir + '/topaz_a1200_v1.0-webfont.woff2')
         copyfile('topaz_a1200_v1.0-webfont.woff',
@@ -332,9 +408,12 @@ class Window(Gtk.Window):
         self.history = []
 
         if filename:
-            self.root = filename[:filename.rfind('/')]
+            self.database = Database()
 
-            self.database = load_database(filename)
+            self.database.load_from_file(filename)
+
+            self.root = filename[:filename.rfind(
+                '/')] + "/" + self.database.database
 
         self.current_node = self.database.nodes[0]
 
@@ -394,21 +473,24 @@ class Window(Gtk.Window):
             self.load_node_by_path(self.current_node.next)
 
     def load_node(self, node, line=0, retrace=True):
-        if not os.path.isfile(temp_dir + '/' + node.subfolder + node.name):
-            with open(temp_dir + '/' + node.subfolder + node.name, 'w') as output_file:
-                output_file.write(node_to_html(node))
-                output_file.close()
-
         self.webview.load_uri('file://' + temp_dir + '/' +
-                              node.subfolder + node.name)
+                              self.database.database + '/' + node.name + '.html')
 
         self.set_title(node.name)
 
-        self.webview.get_user_content_manager().add_style_sheet(WebKit2.UserStyleSheet('''
-        html {
-            font-family: ''' + self.database.font + ''';
-            font-size: ''' + str(self.database.font_size) + '''px;
-        }''', injected_frames=WebKit2.UserContentInjectedFrames.ALL_FRAMES, level=WebKit2.UserStyleLevel.USER))
+        font_family = 'font-family: ''' + self.database.font + ';'
+        font_size = 'font-size: ''' + str(self.database.font_size) + 'px;'
+        if self.database.wordwrap:
+            white_space = 'white-space: pre-wrap;'
+        else:
+            white_space = 'white-space: pre;'
+
+        self.webview.get_user_content_manager().add_style_sheet(WebKit2.UserStyleSheet(
+            'html {'
+            + font_family
+            + font_size
+            + white_space
+            + '}', injected_frames=WebKit2.UserContentInjectedFrames.ALL_FRAMES, level=WebKit2.UserStyleLevel.USER))
 
         # Buttons
 
@@ -466,17 +548,28 @@ class Window(Gtk.Window):
         self.retrace_btn.set_sensitive(history)
 
     def load_node_by_path(self, path, line=0):
-        # Check if path is another guide file
-        if path.find('.guide') >= 0:
-            if os.path.isfile(self.root + '/' + path[:path.rfind('/')]):
-                print(path)
+        # Check if path is an external guide file
+        # if path.find('.guide') >= 0:
+        # if os.path.isfile(self.root + '/' + path[:path.rfind('/')]):
+        # print(path)
         # else:
-        node = self.database.find_node_by_path(path)
+        path_parts = path.split('/')
+        if len(path_parts) == 1:
+            # Simple internal link
+            node = self.database.find_node_by_path(path)
 
-        if node:
-            self.load_node(node, line)
+            if node:
+                self.load_node(node, line)
 
 
 window = Window()
 window.show_all()
 Gtk.main()
+
+# TODO: Application menu
+# TODO: Style menu buttons
+# TODO: Link to external databases
+# TODO: Implement tabstops
+# TODO: Tabs in documents not working correctly (arcdir.dopus5.guide)
+# TODO: Implement width
+# TODO: Problems with spans

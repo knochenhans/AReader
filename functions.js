@@ -9,8 +9,14 @@ document.querySelectorAll('a').forEach(item => {
   })
 });
 
+var beep_snd;
+
+window.addEventListener('load', (event) => {
+  beep_snd = new Audio('../beep.mp3')
+});
+
 function beep() {
-  new Audio('../beep.mp3').play();
+  beep_snd.play();
   var color = document.body.style.backgroundColor;
   setTimeout(function () {
     document.body.style.backgroundColor = '#5078A0';

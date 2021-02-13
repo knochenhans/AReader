@@ -1,8 +1,9 @@
-from os import mkdir, replace
+from os import error, mkdir, replace
 import tempfile
 import regex
 import json
 import os.path
+import subprocess
 from shutil import copyfile
 from gi.repository import Gtk, WebKit2
 import gi
@@ -285,7 +286,8 @@ class Database:
                         continue
         return line
 
-    def load_from_file(self, filename):
+    def create_from_file(self, filename):
+        # TODO: Needs error handling!
 
         # Load guide file, extract database and node information, create subfolder with html files for nodes
         with open(filename, 'r', encoding='cp1252') as input_file:
@@ -308,19 +310,23 @@ class Database:
             # Write all nodes as html
             for node in self.nodes:
                 node.write_as_html(self.database + "/")
+        return True
 
 
 def link_receiver(user_content_manager, javascript_result):
     result = json.loads(javascript_result.get_js_value().to_json(0))
 
-    window.load_node_by_path(result["path"], result["line"])
+    if not window.load_node_by_path(result["path"], result["line"]):
+        print('Unable to open node: ' + result["path"])
 
 
 class Window(Gtk.Window):
     def __init__(self):
+        self.databases = []
+
         Gtk.Window.__init__(self, title="AReader")
 
-        self.set_default_size(675, 620)
+        self.set_default_size(750, 620)
         self.connect("destroy", Gtk.main_quit)
         scrolled_window = Gtk.ScrolledWindow()
 
@@ -408,16 +414,16 @@ class Window(Gtk.Window):
         self.history = []
 
         if filename:
-            self.database = Database()
+            self.databases.append(Database())
+            self.current_database = self.databases[-1]
+            self.current_database.create_from_file(filename)
 
-            self.database.load_from_file(filename)
+            self.base_dir = filename[:filename.rfind(
+                '/')]
 
-            self.root = filename[:filename.rfind(
-                '/')] + "/" + self.database.database
+        self.current_node = self.current_database.nodes[0]
 
-        self.current_node = self.database.nodes[0]
-
-        self.load_node(node=self.database.nodes[0], retrace=False)
+        self.load_node(node=self.current_database.nodes[0], retrace=False)
 
         scrolled_window.add(self.webview)
 
@@ -444,21 +450,21 @@ class Window(Gtk.Window):
         return filename
 
     def on_click_contents_btn(self, button):
-        self.load_node(node=self.database.nodes[0], retrace=True)
+        self.load_node(node=self.current_database.nodes[0], retrace=True)
 
     def on_click_index_btn(self, button):
         if self.current_node.index:
             self.load_node_by_path(self.current_node.index)
 
-        if self.database.index:
-            self.load_node_by_path(self.database.index)
+        if self.current_database.index:
+            self.load_node_by_path(self.current_database.index)
 
     def on_click_help_btn(self, button):
         if self.current_node.help:
             self.load_node_by_path(self.current_node.help)
 
-        if self.database.help:
-            self.load_node_by_path(self.database.help)
+        if self.current_database.help:
+            self.load_node_by_path(self.current_database.help)
 
     def on_click_retrace_btn(self, button):
         if len(self.history) > 0:
@@ -473,14 +479,17 @@ class Window(Gtk.Window):
             self.load_node_by_path(self.current_node.next)
 
     def load_node(self, node, line=0, retrace=True):
+        # TODO: Needs error handling!
+
         self.webview.load_uri('file://' + temp_dir + '/' +
-                              self.database.database + '/' + node.name + '.html')
+                              self.current_database.database + '/' + node.name + '.html')
 
         self.set_title(node.name)
 
-        font_family = 'font-family: ''' + self.database.font + ';'
-        font_size = 'font-size: ''' + str(self.database.font_size) + 'px;'
-        if self.database.wordwrap:
+        font_family = 'font-family: ''' + self.current_database.font + ';'
+        font_size = 'font-size: ''' + \
+            str(self.current_database.font_size) + 'px;'
+        if self.current_database.wordwrap:
             white_space = 'white-space: pre-wrap;'
         else:
             white_space = 'white-space: pre;'
@@ -518,7 +527,7 @@ class Window(Gtk.Window):
         if node.help:
             help = True
         else:
-            if self.database.help:
+            if self.current_database.help:
                 help = True
             else:
                 help = False
@@ -528,7 +537,7 @@ class Window(Gtk.Window):
         if node.index:
             index = True
         else:
-            if self.database.index:
+            if self.current_database.index:
                 index = True
             else:
                 index = False
@@ -546,20 +555,32 @@ class Window(Gtk.Window):
             history = False
 
         self.retrace_btn.set_sensitive(history)
+        return True
 
     def load_node_by_path(self, path, line=0):
-        # Check if path is an external guide file
-        # if path.find('.guide') >= 0:
-        # if os.path.isfile(self.root + '/' + path[:path.rfind('/')]):
-        # print(path)
-        # else:
-        path_parts = path.split('/')
-        if len(path_parts) == 1:
+        path_chunks = path.split('/')
+        if len(path_chunks) == 1:
             # Simple internal link
-            node = self.database.find_node_by_path(path)
+            node = self.current_database.find_node_by_path(path)
 
             if node:
-                self.load_node(node, line)
+                return self.load_node(node, line)
+        else:
+            # Check if file exists (last chunk is main node, so ignore)
+            file = self.base_dir + '/' + '/'.join(path_chunks[:-1])
+            if os.path.isfile(file):
+                # if path_chunks[-2].split(".")[-1] == "ilbm":
+                #     print("ilbm")
+                #     res = subprocess.check_output(["/usr/bin/ilbmtoppm", file, ">", "/tmp/test.ppm"], shell=True)
+                # else:
+                # Load database
+                database = Database()
+                if database.create_from_file(file):
+                    self.databases.append(database)
+                    self.current_database = self.databases[-1]
+                    return self.load_node(self.current_database.find_node_by_path(path_chunks[-1]), line)
+                else:
+                    return False
 
 
 window = Window()
@@ -568,7 +589,7 @@ Gtk.main()
 
 # TODO: Application menu
 # TODO: Style menu buttons
-# TODO: Link to external databases
+# TODO: Maybe introduce subfolders with unique ids?
 # TODO: Implement tabstops
 # TODO: Tabs in documents not working correctly (arcdir.dopus5.guide)
 # TODO: Implement width

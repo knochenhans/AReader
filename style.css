@@ -32,55 +32,67 @@ a:focus {
   background-color: #5078A0;
 }
 
-.fg.highlight {
-  color: white;
-}
-
-.fg.back {
+.fg-back {
   color: rgb(170, 170, 170);
 }
 
-.fg.shine {
+.fg-background {
+  color: rgb(170, 170, 170);
+}
+
+.fg-highlight {
   color: white;
 }
 
-.fg.shadow {
-  color: black;
-}
-
-.fg.fill {
+.fg-fill {
   color: #5078A0;
 }
 
-.fg.filltext {
+.fg-filltext {
   color: black;
 }
 
-.bg.text {
-  background-color: black;
+.fg-shadow {
+  color: black;
 }
 
-.bg.highlight {
-  background-color: white;
+.fg-shine {
+  color: white;
 }
 
-.fg.back {
+.fg-text {
+  color: black;
+}
+
+.bg-back {
   background-color: rgb(170, 170, 170);
 }
 
-.bg.shine {
+.bg-background {
+  background-color: rgb(170, 170, 170);
+}
+
+.bg-highlight {
   background-color: white;
 }
 
-.bg.shadow {
-  background-color: black;
-}
-
-.bg.fill {
+.bg-fill {
   background-color: #5078A0;
 }
 
-.bg.filltext {
+.bg-filltext {
+  background-color: black;
+}
+
+.bg-shadow {
+  background-color: black;
+}
+
+.bg-shine {
+  background-color: white;
+}
+
+.bg-text {
   background-color: black;
 }
 

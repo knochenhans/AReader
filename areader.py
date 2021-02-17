@@ -3,19 +3,23 @@ import tempfile
 import regex
 import json
 import os.path
-import subprocess
+import html
 from shutil import copyfile
-from gi.repository import Gtk, WebKit2
+from gi.repository import Gtk, WebKit2, Gdk, GLib, Gio
 import gi
-from regex.regex import findall
+from regex.regex import findall, search
 gi.require_version('Gtk', '3.0')
 gi.require_version('WebKit2', '4.0')
 
 temp = tempfile.TemporaryFile()
 temp_dir = tempfile.mkdtemp()
 
+# TODO: Maybe show font mapping dialog for non-mapped fonts?
+
 fonts = {
-    "helvetica.font": "helvetica",
+    "helvetica.font": "Helvetica",
+    "courier.font": "Courier New",
+    "times.font": "Times New Roman"
 }
 
 
@@ -47,7 +51,7 @@ class Node:
             self.title + '</title></head><body><p id="' + self.name + \
             '" class="node ' + self.name + '">' + self.text + '</p></body></html>'
 
-        # Write as html files (we need to make sure to use the right extension, otherwise webkit.load_uri() sometimes reads them as raw files)
+        # Write as html files (make sure to use the right extension, otherwise webkit.load_uri() sometimes reads them as raw files)
         with open(temp_dir + '/' + path + self.name + '.html', 'w') as output_file:
             output_file.write(html)
             output_file.close()
@@ -223,18 +227,18 @@ class Database:
             if chunks[0].lower() == 'amigaguide':
                 output = '<b>Amigaguide(R)</b>'
         elif len(chunks) == 2:
-            # Should actually scan for the next fg command and set spans accordingly
             if chunks[0].lower() == 'fg' or chunks[0].lower() == 'bg':
-                if chunks[1].lower() == 'highlight'\
-                        or chunks[1].lower() == 'shine'\
-                        or chunks[1].lower() == 'shadow'\
+                # Translate to pseudo tags to convert later with replace_pseudo_tags()
+                if chunks[1].lower() == 'back'\
+                        or chunks[1].lower() == 'background'\
                         or chunks[1].lower() == 'fill'\
                         or chunks[1].lower() == 'filltext'\
-                        or chunks[1].lower() == 'back':
-                    output = '<span class="' + \
-                        chunks[0].lower() + ' ' + chunks[1].lower() + '">'
-                if chunks[1].lower() == 'text':
-                    output = '</span>'
+                        or chunks[1].lower() == 'highlight'\
+                        or chunks[1].lower() == 'shadow'\
+                        or chunks[1].lower() == 'shine'\
+                        or chunks[1].lower() == 'text':
+                    output = '<' + chunks[0].lower() + \
+                        ' ' + chunks[1].lower() + '>'
             # TODO: Implement quit script
             if chunks[1].lower() == 'close' or chunks[1].lower() == 'quit':
                 output = '<a href="javascript:quit()">' + chunks[0] + '</a>'
@@ -265,8 +269,12 @@ class Database:
             if i >= 0:
                 # Check if we need to ignore the command (lead by a "\")
                 if i > 0:
-                    if line.find('\\', i - 1) >= 0:
-                        i = i + 1
+                    match = regex.match(r'\\', line[i - 1:i])
+                    if match:
+                        # Remove "\" as we don't want it in the output
+                        line = line[:i - 1] + line[i:]
+                        # Continue after the "@"
+                        # TODO: This is a rather dirty solution, find a way to jump over the whole command
                         continue
 
                 match = regex.match(r'@\{(.*?)\}', line[i:])
@@ -280,11 +288,69 @@ class Database:
                     match = regex.match(r'^\s*?@(.*?)$', line)
                     if match:
                         self.process_line_command(match.group(1))
-                        line = ""
+                        line = ''
                     else:
                         i = i + 1
                         continue
         return line
+
+    def replace_pseudo_tags(self, text):
+        # TODO: This algorithm is a mess but it forks for now
+        # Find pseudo tags like 'fg back' and replace with spans accordingly
+
+        found = True
+        last_found = 0  # index for last found pseudo tag
+
+        # Defaults
+        default_colours = {
+            'fg': 'text',
+            'bg': 'back'
+        }
+
+        # Colours from last match
+        last_colours = default_colours.copy()
+
+        other = ""
+
+        while found:
+            re = regex.search(pattern=r'<(fg|bg) (.*?)>',
+                              string=text, pos=last_found)
+
+            if re:
+                layer = re.group(1)
+                style = re.group(2)
+
+                span = ''
+                other = ''
+
+                # Close span if there was a change to any colour layer
+                if last_colours['fg'] != default_colours['fg'] or last_colours['bg'] != default_colours['bg']:
+                    # A span is already open, close span
+                    span += '</span>'
+
+                    # Prepare second style to add (for overlaying layers)
+                    if layer == 'fg' and last_colours['bg'] != default_colours['bg']:
+                        other = ' bg-' + last_colours['bg']
+
+                    if layer == 'bg' and last_colours['fg'] != default_colours['fg']:
+                        other = ' fg-' + last_colours['fg']
+
+                if style != default_colours[layer]:
+                    # No span open, open a new one and add prepared second style
+                    span += '<span class="' + layer + \
+                        '-' + style + other + '">'
+                elif other:
+                    # Just keep last style
+                    span += '<span class="' + other.strip() + '">'
+
+                text = text[:re.start(0)] + span + text[re.end(0):]
+                last_found = re.start(0) + len(span)
+                last_colours[layer] = style
+
+            else:
+                found = False
+
+        return text
 
     def create_from_file(self, filename):
         # TODO: Needs error handling!
@@ -295,14 +361,17 @@ class Database:
 
             for l, line in enumerate(input_file):
 
+                # Replace HTML specific characters so they won’t interfere with the actual HTML code
                 line = line.replace('<', '&lt;')
                 line = line.replace('>', '&gt;')
+                # line = html.escape(line, True) # Doesn’t work for some reason
                 line = self.find_command(line)
-                line = line.replace('\@', '@')
 
-                # Replace in-nodes lines with tags
+                # Replace in-nodes lines with tags and insert into target document
                 if self.in_node:
                     self.nodes[-1].text += line
+
+            self.nodes[-1].text = self.replace_pseudo_tags(self.nodes[-1].text)
 
             # Create subfolder for database files
             mkdir(temp_dir + "/" + self.database)
@@ -484,7 +553,7 @@ class Window(Gtk.Window):
         self.webview.load_uri('file://' + temp_dir + '/' +
                               self.current_database.database + '/' + node.name + '.html')
 
-        self.set_title(node.name)
+        self.set_title(node.title)
 
         font_family = 'font-family: ''' + self.current_database.font + ';'
         font_size = 'font-size: ''' + \
@@ -583,14 +652,18 @@ class Window(Gtk.Window):
                     return False
 
 
-window = Window()
-window.show_all()
-Gtk.main()
+if __name__ == "__main__":
+    window = Window()
+    window.show_all()
+    Gtk.main()
 
 # TODO: Application menu
 # TODO: Style menu buttons
+# TODO: Cursor for entire application
 # TODO: Maybe introduce subfolders with unique ids?
 # TODO: Implement tabstops
 # TODO: Tabs in documents not working correctly (arcdir.dopus5.guide)
 # TODO: Implement width
-# TODO: Problems with spans
+# TODO: Highlight (last) selected links
+# TODO: Process line parameter for links
+# TODO: Find out how index and content actually work

@@ -4,6 +4,7 @@ import regex
 import json
 import os.path
 import html
+import sys
 from shutil import copyfile
 from gi.repository import Gtk, WebKit2, Gdk, GLib, Gio
 import gi
@@ -385,20 +386,34 @@ class Database:
 def link_receiver(user_content_manager, javascript_result):
     result = json.loads(javascript_result.get_js_value().to_json(0))
 
-    if not window.load_node_by_path(result["path"], result["line"]):
+    if not app.window.load_node_by_path(result["path"], result["line"]):
         print('Unable to open node: ' + result["path"])
 
 
-class Window(Gtk.Window):
-    def __init__(self):
+class AppWindow(Gtk.ApplicationWindow):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.set_default_size(750, 600)
+
+        # This will be in the windows group and have the "win" prefix
+        max_action = Gio.SimpleAction.new_stateful(
+            "maximize", None, GLib.Variant.new_boolean(False)
+        )
+        max_action.connect("change-state", self.on_maximize_toggle)
+        self.add_action(max_action)
+
+        # Keep it in sync with the actual state
+        self.connect(
+            "notify::is-maximized",
+            lambda obj, pspec: max_action.set_state(
+                GLib.Variant.new_boolean(obj.props.is_maximized)
+            ),
+        )
+
         self.databases = []
 
-        Gtk.Window.__init__(self, title="AReader")
-
-        self.set_default_size(750, 620)
-        self.connect("destroy", Gtk.main_quit)
-        scrolled_window = Gtk.ScrolledWindow()
-
+        self.scrolled_window = Gtk.ScrolledWindow()
         self.webview = WebKit2.WebView()
 
         # Inject styles and functions
@@ -429,10 +444,10 @@ class Window(Gtk.Window):
 
         # Setup Layout
 
-        vbox = Gtk.VBox()
-        self.add(vbox)
+        self.vbox = Gtk.VBox()
+        self.add(self.vbox)
 
-        button_box = Gtk.HBox()
+        self.button_box = Gtk.HBox()
 
         self.contents_btn = Gtk.Button(label="Contents")
         self.index_btn = Gtk.Button(label="Index")
@@ -448,15 +463,15 @@ class Window(Gtk.Window):
         self.browse_prev_btn.connect("clicked", self.on_click_browse_prev_btn)
         self.browse_next_btn.connect("clicked", self.on_click_browse_next_btn)
 
-        button_box.pack_start(self.contents_btn, True, True, 0)
-        button_box.pack_start(self.index_btn, True, True, 0)
-        button_box.pack_start(self.help_btn, True, True, 0)
-        button_box.pack_start(self.retrace_btn, True, True, 0)
-        button_box.pack_start(self.browse_prev_btn, True, True, 0)
-        button_box.pack_start(self.browse_next_btn, True, True, 0)
+        self.button_box.pack_start(self.contents_btn, True, True, 0)
+        self.button_box.pack_start(self.index_btn, True, True, 0)
+        self.button_box.pack_start(self.help_btn, True, True, 0)
+        self.button_box.pack_start(self.retrace_btn, True, True, 0)
+        self.button_box.pack_start(self.browse_prev_btn, True, True, 0)
+        self.button_box.pack_start(self.browse_next_btn, True, True, 0)
 
-        vbox.pack_start(button_box, False, False, 0)
-        vbox.pack_start(scrolled_window, True, True, 0)
+        self.vbox.pack_start(self.button_box, False, False, 0)
+        self.vbox.pack_start(self.scrolled_window, True, True, 0)
 
         self.contents_btn.set_sensitive(False)
         self.index_btn.set_sensitive(False)
@@ -465,36 +480,19 @@ class Window(Gtk.Window):
         self.browse_prev_btn.set_sensitive(False)
         self.browse_next_btn.set_sensitive(False)
 
-        filename = self.load_file()
+        # lbl_variant = GLib.Variant.new_string("String 1")
+        # lbl_action = Gio.SimpleAction.new_stateful(
+        #     "change_label", lbl_variant.get_type(), lbl_variant
+        # )
+        # lbl_action.connect("change-state", self.on_change_label_state)
+        # self.add_action(lbl_action)
 
-        # Copy some needed files (fonts, cursors, beep sound)
+        # self.label = Gtk.Label(label=lbl_variant.get_string(), margin=30)
+        # self.add(self.label)
+        # self.label.show()
 
-        copyfile('topaz_a1200_v1.0-webfont.woff2',
-                 temp_dir + '/topaz_a1200_v1.0-webfont.woff2')
-        copyfile('topaz_a1200_v1.0-webfont.woff',
-                 temp_dir + '/topaz_a1200_v1.0-webfont.woff')
-        copyfile('cursor_select.cur',
-                 temp_dir + '/cursor_select.cur')
-        copyfile('cursor_link.cur',
-                 temp_dir + '/cursor_link.cur')
-        copyfile('beep.mp3',
-                 temp_dir + '/beep.mp3')
-
-        self.history = []
-
-        if filename:
-            self.databases.append(Database())
-            self.current_database = self.databases[-1]
-            self.current_database.create_from_file(filename)
-
-            self.base_dir = filename[:filename.rfind(
-                '/')]
-
-        self.current_node = self.current_database.nodes[0]
-
-        self.load_node(node=self.current_database.nodes[0], retrace=False)
-
-        scrolled_window.add(self.webview)
+        self.scrolled_window.add(self.webview)
+        self.show_all()
 
     def load_file(self):
         dialog = Gtk.FileChooserDialog(
@@ -516,7 +514,33 @@ class Window(Gtk.Window):
         if dialog.run() == Gtk.ResponseType.OK:
             filename = dialog.get_filename()
             dialog.destroy()
-        return filename
+
+        if filename:
+            self.databases.append(Database())
+            self.current_database = self.databases[-1]
+            self.current_database.create_from_file(filename)
+
+            self.base_dir = filename[:filename.rfind(
+                '/')]
+
+        self.current_node = self.current_database.nodes[0]
+
+        # Copy some needed files (fonts, cursors, beep sound)
+
+        copyfile('topaz_a1200_v1.0-webfont.woff2',
+                 temp_dir + '/topaz_a1200_v1.0-webfont.woff2')
+        copyfile('topaz_a1200_v1.0-webfont.woff',
+                 temp_dir + '/topaz_a1200_v1.0-webfont.woff')
+        copyfile('cursor_select.cur',
+                 temp_dir + '/cursor_select.cur')
+        copyfile('cursor_link.cur',
+                 temp_dir + '/cursor_link.cur')
+        copyfile('beep.mp3',
+                 temp_dir + '/beep.mp3')
+
+        self.history = []
+
+        self.load_node(node=self.current_database.nodes[0], retrace=False)
 
     def on_click_contents_btn(self, button):
         self.load_node(node=self.current_database.nodes[0], retrace=True)
@@ -635,6 +659,8 @@ class Window(Gtk.Window):
             if node:
                 return self.load_node(node, line)
         else:
+            # External link
+
             # Check if file exists (last chunk is main node, so ignore)
             file = self.base_dir + '/' + '/'.join(path_chunks[:-1])
             if os.path.isfile(file):
@@ -651,19 +677,100 @@ class Window(Gtk.Window):
                 else:
                     return False
 
+    # def on_change_label_state(self, action, value):
+    #     action.set_state(value)
+    #     self.label.set_text(value.get_string())
+
+    def on_maximize_toggle(self, action, value):
+        action.set_state(value)
+        if value.get_boolean():
+            self.maximize()
+        else:
+            self.unmaximize()
+
+
+class Application(Gtk.Application):
+    def __init__(self, *args, **kwargs):
+        super().__init__(
+            *args,
+            application_id="org.example.areader",
+            flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE,
+            **kwargs
+        )
+        self.window = None
+
+        self.add_main_option(
+            "test",
+            ord("t"),
+            GLib.OptionFlags.NONE,
+            GLib.OptionArg.NONE,
+            "Command line test",
+            None,
+        )
+
+    def do_startup(self):
+        Gtk.Application.do_startup(self)
+
+        action = Gio.SimpleAction.new("open", None)
+        action.connect("activate", self.on_open)
+        self.add_action(action)
+
+        action = Gio.SimpleAction.new("about", None)
+        action.connect("activate", self.on_about)
+        self.add_action(action)
+
+        action = Gio.SimpleAction.new("quit", None)
+        action.connect("activate", self.on_quit)
+        self.add_action(action)
+
+        builder = Gtk.Builder()
+        builder.add_from_file("menu.xml")
+
+        self.set_menubar(builder.get_object("menubar"))
+
+    def do_activate(self):
+        # We only allow a single window and raise any existing ones
+        if not self.window:
+            # Windows are associated with the application
+            # when the last one is closed the application shuts down
+            self.window = AppWindow(application=self, title="AReader")
+
+        self.window.present()
+
+    def do_command_line(self, command_line):
+        options = command_line.get_options_dict()
+        # convert GVariantDict -> GVariant -> dict
+        options = options.end().unpack()
+
+        if "test" in options:
+            # This is printed on the main instance
+            print("Test argument received: %s" % options["test"])
+
+        self.activate()
+        return 0
+
+    def on_open(self, action, param):
+        self.window.load_file()
+
+    def on_about(self, action, param):
+        about_dialog = Gtk.AboutDialog(transient_for=self.window, modal=True)
+        about_dialog.present()
+
+    def on_quit(self, action, param):
+        self.quit()
+
 
 if __name__ == "__main__":
-    window = Window()
-    window.show_all()
-    Gtk.main()
+    app = Application()
+    app.run(sys.argv)
 
-# TODO: Application menu
 # TODO: Style menu buttons
 # TODO: Cursor for entire application
 # TODO: Maybe introduce subfolders with unique ids?
 # TODO: Implement tabstops
 # TODO: Tabs in documents not working correctly (arcdir.dopus5.guide)
-# TODO: Implement width
+# TODO: Implement document width
 # TODO: Highlight (last) selected links
 # TODO: Process line parameter for links
 # TODO: Find out how index and content actually work
+# TODO: Problems with retrace for external documents

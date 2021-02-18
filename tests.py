@@ -12,7 +12,7 @@ class DatabaseTests(unittest.TestCase):
         database.nodes.append(node)
         self.assertEqual(database.replace_pseudo_tags(
             node.text), '<span class="fg-back">test</span>')
-    
+
     def test_pseudo_tags_simple2(self):
         database = Database()
         node = Node(database)
@@ -21,7 +21,7 @@ class DatabaseTests(unittest.TestCase):
         database.nodes.append(node)
         self.assertEqual(database.replace_pseudo_tags(
             node.text), '<span class="fg-back"></span><span class="fg-highlight"></span>')
-    
+
     def test_pseudo_tags_simple3(self):
         database = Database()
         node = Node(database)
@@ -30,7 +30,7 @@ class DatabaseTests(unittest.TestCase):
         database.nodes.append(node)
         self.assertEqual(database.replace_pseudo_tags(
             node.text), '<span class="fg-back"></span><span class="fg-highlight"></span><span class="bg-shine"></span>')
-    
+
     def test_pseudo_tags_nested1(self):
         database = Database()
         node = Node(database)
@@ -95,6 +95,12 @@ x<span class="u">underline</span>x'''
         output = ['test', 'is', 'a', 'is a', 'test']
         self.assertEqual(database.breakup_command(
             'test "is" a "is a" test'), output)
+
+    def test_inline_commands(self):
+        # TODO: Add more tests
+        database = Database()
+        output = '<b>Amigaguide(R)</b>'
+        self.assertEqual(database.process_inline_command('amigaguide'), output)
 
 
 if __name__ == '__main__':

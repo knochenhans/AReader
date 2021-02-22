@@ -1,0 +1,16 @@
+button {
+    border-radius: 0px;
+    color: black;
+    background: #AAAAAA;
+    border-width: 3px;
+    border-top-color: white;
+    border-left-color: white;
+    border-right-color: black;
+    border-bottom-color: black;
+    padding: 0;
+    transition: 0
+}
+
+button:disabled {
+    background-image: url("background-disabled.png");
+}

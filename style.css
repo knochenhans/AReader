@@ -1,7 +1,7 @@
 @font-face {
   font-family: 'topaz';
   src: url('../topaz_a1200_v1.0-webfont.woff2') format('woff2'),
-    url('../CyberBlanker.guide/topaz_a1200_v1.0-webfont.woff') format('woff');
+    url('../topaz_a1200_v1.0-webfont.woff') format('woff');
 }
 
 body {

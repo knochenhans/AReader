@@ -6,7 +6,7 @@ import os.path
 import html
 import sys
 from shutil import copyfile
-from gi.repository import Gtk, WebKit2, Gdk, GLib, Gio
+from gi.repository import Gtk, WebKit2, Gdk, GdkPixbuf, GLib, Gio
 import gi
 from regex.regex import findall, search
 gi.require_version('Gtk', '3.0')
@@ -390,32 +390,55 @@ def link_receiver(user_content_manager, javascript_result):
         print('Unable to open node: ' + result["path"])
 
 
+class DatabaseDialog(Gtk.Dialog):
+    def __init__(self, parent):
+        Gtk.Dialog.__init__(self, title="Database Information",
+                            transient_for=parent, flags=0)
+        self.add_buttons(
+            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OK, Gtk.ResponseType.OK
+        )
+
+        self.set_default_size(150, 100)
+
+        label = Gtk.Label(
+            label="This is a dialog to display additional information")
+
+        box = self.get_content_area()
+        box.add(label)
+        self.show_all()
+
+
 class AppWindow(Gtk.ApplicationWindow):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.set_default_size(750, 600)
 
-        # This will be in the windows group and have the "win" prefix
-        max_action = Gio.SimpleAction.new_stateful(
-            "maximize", None, GLib.Variant.new_boolean(False)
-        )
-        max_action.connect("change-state", self.on_maximize_toggle)
-        self.add_action(max_action)
-
-        # Keep it in sync with the actual state
-        self.connect(
-            "notify::is-maximized",
-            lambda obj, pspec: max_action.set_state(
-                GLib.Variant.new_boolean(obj.props.is_maximized)
-            ),
-        )
-
         self.databases = []
 
         self.scrolled_window = Gtk.ScrolledWindow()
         self.webview = WebKit2.WebView()
 
+        self.setup_content_manager()
+        self.setup_layout()
+        self.setup_style()
+
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file('cursor_select.cur')
+        cursor = Gdk.Cursor.new_from_pixbuf(Gdk.Display.get_default(), pixbuf, 5, 5)
+        self.get_window().set_cursor(cursor)
+
+    def setup_style(self):
+        css = b'''
+            @import url("gtk.css");
+            '''
+        css_provider = Gtk.CssProvider()
+        css_provider.load_from_data(css)
+        context = Gtk.StyleContext()
+        screen = Gdk.Screen.get_default()
+        context.add_provider_for_screen(screen, css_provider,
+                                        Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+
+    def setup_content_manager(self):
         # Inject styles and functions
 
         content_manager = self.webview.get_user_content_manager()
@@ -435,14 +458,13 @@ class AppWindow(Gtk.ApplicationWindow):
             ), injected_frames=WebKit2.UserContentInjectedFrames.ALL_FRAMES, injection_time=WebKit2.UserScriptInjectionTime.END))
         functions.close()
 
-        # Callback function for links to nodes (overriding html links)
-
+        # Callback function for links (overriding html links)
         content_manager.register_script_message_handler("signal")
-
         content_manager.connect(
             "script-message-received::signal", link_receiver)
 
-        # Setup Layout
+    def setup_layout(self):
+        # Setup layout
 
         self.vbox = Gtk.VBox()
         self.add(self.vbox)
@@ -479,17 +501,6 @@ class AppWindow(Gtk.ApplicationWindow):
         self.retrace_btn.set_sensitive(False)
         self.browse_prev_btn.set_sensitive(False)
         self.browse_next_btn.set_sensitive(False)
-
-        # lbl_variant = GLib.Variant.new_string("String 1")
-        # lbl_action = Gio.SimpleAction.new_stateful(
-        #     "change_label", lbl_variant.get_type(), lbl_variant
-        # )
-        # lbl_action.connect("change-state", self.on_change_label_state)
-        # self.add_action(lbl_action)
-
-        # self.label = Gtk.Label(label=lbl_variant.get_string(), margin=30)
-        # self.add(self.label)
-        # self.label.show()
 
         self.scrolled_window.add(self.webview)
         self.show_all()
@@ -542,6 +553,10 @@ class AppWindow(Gtk.ApplicationWindow):
 
         self.load_node(node=self.current_database.nodes[0], retrace=False)
 
+    def show_database_info(self):
+        dialog = DatabaseDialog(self)
+        dialog.present()
+
     def on_click_contents_btn(self, button):
         self.load_node(node=self.current_database.nodes[0], retrace=True)
 
@@ -571,31 +586,7 @@ class AppWindow(Gtk.ApplicationWindow):
         if self.current_node.next:
             self.load_node_by_path(self.current_node.next)
 
-    def load_node(self, node, line=0, retrace=True):
-        # TODO: Needs error handling!
-
-        self.webview.load_uri('file://' + temp_dir + '/' +
-                              self.current_database.database + '/' + node.name + '.html')
-
-        self.set_title(node.title)
-
-        font_family = 'font-family: ''' + self.current_database.font + ';'
-        font_size = 'font-size: ''' + \
-            str(self.current_database.font_size) + 'px;'
-        if self.current_database.wordwrap:
-            white_space = 'white-space: pre-wrap;'
-        else:
-            white_space = 'white-space: pre;'
-
-        self.webview.get_user_content_manager().add_style_sheet(WebKit2.UserStyleSheet(
-            'html {'
-            + font_family
-            + font_size
-            + white_space
-            + '}', injected_frames=WebKit2.UserContentInjectedFrames.ALL_FRAMES, level=WebKit2.UserStyleLevel.USER))
-
-        # Buttons
-
+    def update_buttons(self, node):
         if node.next:
             next = True
         else:
@@ -637,17 +628,43 @@ class AppWindow(Gtk.ApplicationWindow):
 
         self.contents_btn.set_sensitive(index)
 
-        if retrace:
-            self.history.append(self.current_node)
-
-        self.current_node = node
-
         if len(self.history) > 0:
             history = True
         else:
             history = False
 
         self.retrace_btn.set_sensitive(history)
+
+    def load_node(self, node, line=0, retrace=True):
+        # TODO: Needs error handling!
+
+        self.webview.load_uri('file://' + temp_dir + '/' +
+                              self.current_database.database + '/' + node.name + '.html')
+
+        self.set_title(node.title)
+
+        font_family = 'font-family: ''' + self.current_database.font + ';'
+        font_size = 'font-size: ''' + \
+            str(self.current_database.font_size) + 'px;'
+        if self.current_database.wordwrap:
+            white_space = 'white-space: pre-wrap;'
+        else:
+            white_space = 'white-space: pre;'
+
+        self.webview.get_user_content_manager().add_style_sheet(WebKit2.UserStyleSheet(
+            'html {'
+            + font_family
+            + font_size
+            + white_space
+            + '}', injected_frames=WebKit2.UserContentInjectedFrames.ALL_FRAMES, level=WebKit2.UserStyleLevel.USER))
+
+        if retrace:
+            self.history.append(self.current_node)
+
+        self.update_buttons(node)
+
+        self.current_node = node
+
         return True
 
     def load_node_by_path(self, path, line=0):
@@ -677,42 +694,25 @@ class AppWindow(Gtk.ApplicationWindow):
                 else:
                     return False
 
-    # def on_change_label_state(self, action, value):
-    #     action.set_state(value)
-    #     self.label.set_text(value.get_string())
-
-    def on_maximize_toggle(self, action, value):
-        action.set_state(value)
-        if value.get_boolean():
-            self.maximize()
-        else:
-            self.unmaximize()
-
 
 class Application(Gtk.Application):
     def __init__(self, *args, **kwargs):
         super().__init__(
             *args,
             application_id="org.example.areader",
-            flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE,
             **kwargs
         )
         self.window = None
-
-        self.add_main_option(
-            "test",
-            ord("t"),
-            GLib.OptionFlags.NONE,
-            GLib.OptionArg.NONE,
-            "Command line test",
-            None,
-        )
 
     def do_startup(self):
         Gtk.Application.do_startup(self)
 
         action = Gio.SimpleAction.new("open", None)
         action.connect("activate", self.on_open)
+        self.add_action(action)
+
+        action = Gio.SimpleAction.new("show_database_info", None)
+        action.connect("activate", self.on_database_info)
         self.add_action(action)
 
         action = Gio.SimpleAction.new("about", None)
@@ -729,28 +729,16 @@ class Application(Gtk.Application):
         self.set_menubar(builder.get_object("menubar"))
 
     def do_activate(self):
-        # We only allow a single window and raise any existing ones
         if not self.window:
-            # Windows are associated with the application
-            # when the last one is closed the application shuts down
             self.window = AppWindow(application=self, title="AReader")
 
         self.window.present()
 
-    def do_command_line(self, command_line):
-        options = command_line.get_options_dict()
-        # convert GVariantDict -> GVariant -> dict
-        options = options.end().unpack()
-
-        if "test" in options:
-            # This is printed on the main instance
-            print("Test argument received: %s" % options["test"])
-
-        self.activate()
-        return 0
-
     def on_open(self, action, param):
         self.window.load_file()
+
+    def on_database_info(self, action, param):
+        self.window.show_database_info()
 
     def on_about(self, action, param):
         about_dialog = Gtk.AboutDialog(transient_for=self.window, modal=True)
@@ -774,3 +762,4 @@ if __name__ == "__main__":
 # TODO: Process line parameter for links
 # TODO: Find out how index and content actually work
 # TODO: Problems with retrace for external documents
+# TODO: Database info window

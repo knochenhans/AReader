@@ -752,8 +752,7 @@ if __name__ == "__main__":
     app = Application()
     app.run(sys.argv)
 
-# TODO: Style menu buttons
-# TODO: Cursor for entire application
+# TODO: Font for menu buttons
 # TODO: Maybe introduce subfolders with unique ids?
 # TODO: Implement tabstops
 # TODO: Tabs in documents not working correctly (arcdir.dopus5.guide)

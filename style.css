@@ -7,7 +7,7 @@
 body {
   background-color: rgb(170, 170, 170);
   color: black;
-  line-height: 150%;
+  line-height: 135%;
   cursor: url('../cursor_select.cur'), auto;
 }
 
@@ -29,6 +29,10 @@ a {
 
 a:visited,
 a:focus {
+  background-color: #5078A0;
+}
+
+.highlight {
   background-color: #5078A0;
 }
 

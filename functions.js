@@ -2,7 +2,7 @@ document.querySelectorAll('a').forEach(item => {
   item.addEventListener('click', event => {
     // Send JSON message to application
     window.webkit.messageHandlers.signal.postMessage(
-      { "path": item.dataset.path, "line": item.dataset.line });
+      { 'path': item.dataset.path, 'line': item.dataset.line });
 
     // Keep href from being parsed
     return false;
@@ -26,7 +26,12 @@ function beep() {
   }, 200);
 }
 
-function set_font(font, font_size) {
-  document.body.style.fontFamily = font;
-  document.body.style.fontSize = font_size;
-}
+// function set_font(font, font_size) {
+//   document.body.style.fontFamily = font;
+//   document.body.style.fontSize = font_size;
+// }
+
+// function alert_box() {
+//   alert('bla');
+//   document.getElementsByTagName('a')[0].style.backgroundColor = 'red';
+// }

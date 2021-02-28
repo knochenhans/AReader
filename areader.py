@@ -55,7 +55,6 @@ class Node:
         # Write as html files (make sure to use the right extension, otherwise webkit.load_uri() sometimes reads them as raw files)
         with open(temp_dir + '/' + path + self.name + '.html', 'w') as output_file:
             output_file.write(html)
-            output_file.close()
 
 
 class Database:
@@ -424,13 +423,12 @@ class AppWindow(Gtk.ApplicationWindow):
         self.setup_style()
 
         pixbuf = GdkPixbuf.Pixbuf.new_from_file('cursor_select.cur')
-        cursor = Gdk.Cursor.new_from_pixbuf(Gdk.Display.get_default(), pixbuf, 5, 5)
+        cursor = Gdk.Cursor.new_from_pixbuf(
+            Gdk.Display.get_default(), pixbuf, 5, 5)
         self.get_window().set_cursor(cursor)
 
     def setup_style(self):
-        css = b'''
-            @import url("gtk.css");
-            '''
+        css = b'@import url("gtk.css");'
         css_provider = Gtk.CssProvider()
         css_provider.load_from_data(css)
         context = Gtk.StyleContext()
@@ -446,22 +444,19 @@ class AppWindow(Gtk.ApplicationWindow):
         # with open('normalize.css', 'r') as style:
         #     content_manager.add_style_sheet(WebKit2.UserStyleSheet(style.read(
         #     ), injected_frames=WebKit2.UserContentInjectedFrames.ALL_FRAMES, level=WebKit2.UserStyleLevel.USER))
-        # style.close()
 
         with open('style.css', 'r') as style:
             content_manager.add_style_sheet(WebKit2.UserStyleSheet(style.read(
             ), injected_frames=WebKit2.UserContentInjectedFrames.ALL_FRAMES, level=WebKit2.UserStyleLevel.USER))
-        style.close()
 
         with open('functions.js', 'r') as functions:
             content_manager.add_script(WebKit2.UserScript(source=functions.read(
             ), injected_frames=WebKit2.UserContentInjectedFrames.ALL_FRAMES, injection_time=WebKit2.UserScriptInjectionTime.END))
-        functions.close()
 
         # Callback function for links (overriding html links)
-        content_manager.register_script_message_handler("signal")
+        content_manager.register_script_message_handler('signal')
         content_manager.connect(
-            "script-message-received::signal", link_receiver)
+            'script-message-received::signal', link_receiver)
 
     def setup_layout(self):
         # Setup layout
@@ -473,24 +468,45 @@ class AppWindow(Gtk.ApplicationWindow):
 
         self.contents_btn = Gtk.Button(label="Contents")
         self.index_btn = Gtk.Button(label="Index")
-        self.help_btn = Gtk.Button(label="Help")
-        self.retrace_btn = Gtk.Button(label="Retrace")
-        self.browse_prev_btn = Gtk.Button(label="Browse <")
-        self.browse_next_btn = Gtk.Button(label="Browse >")
+        self.help_btn = Gtk.Button(label='Help')
+        self.retrace_btn = Gtk.Button(label='Retrace')
+        self.browse_prev_btn = Gtk.Button(label='Browse <')
+        self.browse_next_btn = Gtk.Button(label='Browse >')
 
-        self.contents_btn.connect("clicked", self.on_click_contents_btn)
-        self.index_btn.connect("clicked", self.on_click_index_btn)
-        self.help_btn.connect("clicked", self.on_click_help_btn)
-        self.retrace_btn.connect("clicked", self.on_click_retrace_btn)
-        self.browse_prev_btn.connect("clicked", self.on_click_browse_prev_btn)
-        self.browse_next_btn.connect("clicked", self.on_click_browse_next_btn)
+        width = 70
+        height = 25
 
-        self.button_box.pack_start(self.contents_btn, True, True, 0)
-        self.button_box.pack_start(self.index_btn, True, True, 0)
-        self.button_box.pack_start(self.help_btn, True, True, 0)
-        self.button_box.pack_start(self.retrace_btn, True, True, 0)
-        self.button_box.pack_start(self.browse_prev_btn, True, True, 0)
-        self.button_box.pack_start(self.browse_next_btn, True, True, 0)
+        self.contents_btn.set_property('width-request', width)
+        self.contents_btn.set_property('height-request', height)
+
+        self.index_btn.set_property('width-request', width)
+        self.index_btn.set_property('height-request', height)
+
+        self.help_btn.set_property('width-request', width)
+        self.help_btn.set_property('height-request', height)
+
+        self.retrace_btn.set_property('width-request', width)
+        self.retrace_btn.set_property('height-request', height)
+
+        self.browse_prev_btn.set_property('width-request', width)
+        self.browse_prev_btn.set_property('height-request', height)
+
+        self.browse_next_btn.set_property('width-request', width)
+        self.browse_next_btn.set_property('height-request', height)
+
+        self.contents_btn.connect('clicked', self.on_click_contents_btn)
+        self.index_btn.connect('clicked', self.on_click_index_btn)
+        self.help_btn.connect('clicked', self.on_click_help_btn)
+        self.retrace_btn.connect('clicked', self.on_click_retrace_btn)
+        self.browse_prev_btn.connect('clicked', self.on_click_browse_prev_btn)
+        self.browse_next_btn.connect('clicked', self.on_click_browse_next_btn)
+
+        self.button_box.pack_start(self.contents_btn, False, True, 0)
+        self.button_box.pack_start(self.index_btn, False, True, 0)
+        self.button_box.pack_start(self.help_btn, False, True, 0)
+        self.button_box.pack_start(self.retrace_btn, False, True, 0)
+        self.button_box.pack_start(self.browse_prev_btn, False, True, 0)
+        self.button_box.pack_start(self.browse_next_btn, False, True, 0)
 
         self.vbox.pack_start(self.button_box, False, False, 0)
         self.vbox.pack_start(self.scrolled_window, True, True, 0)
@@ -507,7 +523,7 @@ class AppWindow(Gtk.ApplicationWindow):
 
     def load_file(self):
         dialog = Gtk.FileChooserDialog(
-            title="Please choose a file", parent=self, action=Gtk.FileChooserAction.OPEN)
+            title='Please choose a file', parent=self, action=Gtk.FileChooserAction.OPEN)
         dialog.add_buttons(
             Gtk.STOCK_CANCEL,
             Gtk.ResponseType.CANCEL,
@@ -516,8 +532,8 @@ class AppWindow(Gtk.ApplicationWindow):
         )
 
         filter_any = Gtk.FileFilter()
-        filter_any.set_name("AmigaGuide files")
-        filter_any.add_pattern("*.guide")
+        filter_any.set_name('AmigaGuide files')
+        filter_any.add_pattern('*.guide')
         dialog.add_filter(filter_any)
 
         filename = ""
@@ -665,6 +681,8 @@ class AppWindow(Gtk.ApplicationWindow):
 
         self.current_node = node
 
+        # self.webview.run_javascript('alert_box();')
+
         return True
 
     def load_node_by_path(self, path, line=0):
@@ -752,13 +770,18 @@ if __name__ == "__main__":
     app = Application()
     app.run(sys.argv)
 
-# TODO: Font for menu buttons
+# TODO: Topaz font for menu buttons
+# TODO: Limit button style to buttons (not entire application)
+# TODO: Save last opened documents
+# TODO: Save last opened path
 # TODO: Maybe introduce subfolders with unique ids?
 # TODO: Implement tabstops
 # TODO: Tabs in documents not working correctly (arcdir.dopus5.guide)
 # TODO: Implement document width
-# TODO: Highlight (last) selected links
 # TODO: Process line parameter for links
 # TODO: Find out how index and content actually work
 # TODO: Problems with retrace for external documents
 # TODO: Database info window
+# TODO: Highlight (last) selected links (manually color links? ("visited selector matches all element whose _href link already visited_."))
+# TODO: Rework temp files so they get deleted after program exit
+# TODO: Problems when loading the same document again

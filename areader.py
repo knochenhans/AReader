@@ -172,7 +172,8 @@ class Database:
             self.font_size = int(chunks[2])
 
         if chunks[0].lower() == 'rem' or chunks[0].lower() == 'remark':
-            self.remark = chunks[1]
+            if len(chunks) > 1:
+                self.remark = chunks[1]
 
         if chunks[0].lower() == 'width':
             self.width = int(chunks[1])

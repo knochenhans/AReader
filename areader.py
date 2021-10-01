@@ -1,16 +1,17 @@
-from os import error, mkdir, replace
-import tempfile
-import regex
 import json
-import os.path
-import html
-import sys
+from os import error, mkdir, replace, path
 from shutil import copyfile
-from gi.repository import Gtk, WebKit2, Gdk, GdkPixbuf, GLib, Gio
-import gi
-from regex.regex import findall, search
-gi.require_version('Gtk', '3.0')
-gi.require_version('WebKit2', '4.0')
+import sys
+import tempfile
+from tokenize import String
+import regex
+from PySide6.QtCore import QUrl, QObject, Slot
+from PySide6.QtGui import QIcon, QCursor, QPixmap
+from PySide6.QtWidgets import (QApplication, QLineEdit,
+                               QMainWindow, QPushButton, QToolBar)
+from PySide6.QtWebEngineWidgets import QWebEngineView
+from PySide6.QtWebChannel import QWebChannel
+from PySide6.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget, QFileDialog
 
 temp = tempfile.TemporaryFile()
 temp_dir = tempfile.mkdtemp()
@@ -49,7 +50,15 @@ class Node:
 
     def write_as_html(self, path):
         html = '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8" /><title>' + \
-            self.title + '</title></head><body><p id="' + self.name + \
+            self.title + '</title>\n'
+
+        html += '<link rel="stylesheet" href="../style.css">\n'
+        html += '<script type="text/javascript" src="../functions.js"></script>\n'
+
+        # Enable communication between the application and Javascript
+        html += '''<script src='qrc:///qtwebchannel/qwebchannel.js'></script>\n'''
+
+        html += '</head><body><p id="' + self.name + \
             '" class="node ' + self.name + '">' + self.text + '</p></body></html>'
 
         # Write as html files (make sure to use the right extension, otherwise webkit.load_uri() sometimes reads them as raw files)
@@ -78,7 +87,7 @@ class Database:
         self.width = 100
         self.wordwrap = False
         self.xref = ""
-        #self.settabs = []
+        # self.settabs = []
         self.nodes = []
 
         # Status variable for node parser
@@ -256,9 +265,9 @@ class Database:
                     line = int(chunks[3])
                 else:
                     line = 0
-                output = '<a href="" data-path="' + \
-                    chunks[2] + '" data-line="' + \
-                    str(line) + '">' + chunks[0] + '</a>'
+                output = "<button type='button' onclick='document.bridge.button_clicked(JSON.stringify({path: \"" + \
+                    chunks[2] + "\", line: \"" + \
+                    str(line) + "\"}))'>" + chunks[0] + "</button>"
 
         return output
 
@@ -383,306 +392,17 @@ class Database:
         return True
 
 
-def link_receiver(user_content_manager, javascript_result):
-    result = json.loads(javascript_result.get_js_value().to_json(0))
-
-    if not app.window.load_node_by_path(result["path"], result["line"]):
-        print('Unable to open node: ' + result["path"])
-
-
-class DatabaseDialog(Gtk.Dialog):
-    def __init__(self, parent):
-        Gtk.Dialog.__init__(self, title="Database Information",
-                            transient_for=parent, flags=0)
-        self.add_buttons(
-            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OK, Gtk.ResponseType.OK
-        )
-
-        self.set_default_size(150, 100)
-
-        label = Gtk.Label(
-            label="This is a dialog to display additional information")
-
-        box = self.get_content_area()
-        box.add(label)
-        self.show_all()
-
-
-class AppWindow(Gtk.ApplicationWindow):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        self.set_default_size(750, 600)
-
-        self.databases = []
-
-        self.scrolled_window = Gtk.ScrolledWindow()
-        self.webview = WebKit2.WebView()
-
-        self.setup_content_manager()
-        self.setup_layout()
-        self.setup_style()
-
-        pixbuf = GdkPixbuf.Pixbuf.new_from_file('cursor_select.cur')
-        cursor = Gdk.Cursor.new_from_pixbuf(
-            Gdk.Display.get_default(), pixbuf, 5, 5)
-        self.get_window().set_cursor(cursor)
-
-    def setup_style(self):
-        css = b'@import url("gtk.css");'
-        css_provider = Gtk.CssProvider()
-        css_provider.load_from_data(css)
-        context = Gtk.StyleContext()
-        screen = Gdk.Screen.get_default()
-        context.add_provider_for_screen(screen, css_provider,
-                                        Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-
-    def setup_content_manager(self):
-        # Inject styles and functions
-
-        content_manager = self.webview.get_user_content_manager()
-
-        # with open('normalize.css', 'r') as style:
-        #     content_manager.add_style_sheet(WebKit2.UserStyleSheet(style.read(
-        #     ), injected_frames=WebKit2.UserContentInjectedFrames.ALL_FRAMES, level=WebKit2.UserStyleLevel.USER))
-
-        with open('style.css', 'r') as style:
-            content_manager.add_style_sheet(WebKit2.UserStyleSheet(style.read(
-            ), injected_frames=WebKit2.UserContentInjectedFrames.ALL_FRAMES, level=WebKit2.UserStyleLevel.USER))
-
-        with open('functions.js', 'r') as functions:
-            content_manager.add_script(WebKit2.UserScript(source=functions.read(
-            ), injected_frames=WebKit2.UserContentInjectedFrames.ALL_FRAMES, injection_time=WebKit2.UserScriptInjectionTime.END))
-
-        # Callback function for links (overriding html links)
-        content_manager.register_script_message_handler('signal')
-        content_manager.connect(
-            'script-message-received::signal', link_receiver)
-
-    def setup_layout(self):
-        # Setup layout
-
-        self.vbox = Gtk.VBox()
-        self.add(self.vbox)
-
-        self.button_box = Gtk.HBox()
-
-        self.contents_btn = Gtk.Button(label="Contents")
-        self.index_btn = Gtk.Button(label="Index")
-        self.help_btn = Gtk.Button(label='Help')
-        self.retrace_btn = Gtk.Button(label='Retrace')
-        self.browse_prev_btn = Gtk.Button(label='Browse <')
-        self.browse_next_btn = Gtk.Button(label='Browse >')
-
-        width = 70
-        height = 25
-
-        self.contents_btn.set_property('width-request', width)
-        self.contents_btn.set_property('height-request', height)
-
-        self.index_btn.set_property('width-request', width)
-        self.index_btn.set_property('height-request', height)
-
-        self.help_btn.set_property('width-request', width)
-        self.help_btn.set_property('height-request', height)
-
-        self.retrace_btn.set_property('width-request', width)
-        self.retrace_btn.set_property('height-request', height)
-
-        self.browse_prev_btn.set_property('width-request', width)
-        self.browse_prev_btn.set_property('height-request', height)
-
-        self.browse_next_btn.set_property('width-request', width)
-        self.browse_next_btn.set_property('height-request', height)
-
-        self.contents_btn.connect('clicked', self.on_click_contents_btn)
-        self.index_btn.connect('clicked', self.on_click_index_btn)
-        self.help_btn.connect('clicked', self.on_click_help_btn)
-        self.retrace_btn.connect('clicked', self.on_click_retrace_btn)
-        self.browse_prev_btn.connect('clicked', self.on_click_browse_prev_btn)
-        self.browse_next_btn.connect('clicked', self.on_click_browse_next_btn)
-
-        self.button_box.pack_start(self.contents_btn, False, True, 0)
-        self.button_box.pack_start(self.index_btn, False, True, 0)
-        self.button_box.pack_start(self.help_btn, False, True, 0)
-        self.button_box.pack_start(self.retrace_btn, False, True, 0)
-        self.button_box.pack_start(self.browse_prev_btn, False, True, 0)
-        self.button_box.pack_start(self.browse_next_btn, False, True, 0)
-
-        self.vbox.pack_start(self.button_box, False, False, 0)
-        self.vbox.pack_start(self.scrolled_window, True, True, 0)
-
-        self.contents_btn.set_sensitive(False)
-        self.index_btn.set_sensitive(False)
-        self.help_btn.set_sensitive(False)
-        self.retrace_btn.set_sensitive(False)
-        self.browse_prev_btn.set_sensitive(False)
-        self.browse_next_btn.set_sensitive(False)
-
-        self.scrolled_window.add(self.webview)
-        self.show_all()
-
-    def load_file(self):
-        dialog = Gtk.FileChooserDialog(
-            title='Please choose a file', parent=self, action=Gtk.FileChooserAction.OPEN)
-        dialog.add_buttons(
-            Gtk.STOCK_CANCEL,
-            Gtk.ResponseType.CANCEL,
-            Gtk.STOCK_OPEN,
-            Gtk.ResponseType.OK,
-        )
-
-        filter_any = Gtk.FileFilter()
-        filter_any.set_name('AmigaGuide files')
-        filter_any.add_pattern('*.guide')
-        dialog.add_filter(filter_any)
-
-        filename = ""
-
-        if dialog.run() == Gtk.ResponseType.OK:
-            filename = dialog.get_filename()
-            dialog.destroy()
-
-        if filename:
-            self.databases.append(Database())
-            self.current_database = self.databases[-1]
-            self.current_database.create_from_file(filename)
-
-            self.base_dir = filename[:filename.rfind(
-                '/')]
-
-        self.current_node = self.current_database.nodes[0]
-
-        # Copy some needed files (fonts, cursors, beep sound)
-
-        copyfile('topaz_a1200_v1.0-webfont.woff2',
-                 temp_dir + '/topaz_a1200_v1.0-webfont.woff2')
-        copyfile('topaz_a1200_v1.0-webfont.woff',
-                 temp_dir + '/topaz_a1200_v1.0-webfont.woff')
-        copyfile('cursor_select.cur',
-                 temp_dir + '/cursor_select.cur')
-        copyfile('cursor_link.cur',
-                 temp_dir + '/cursor_link.cur')
-        copyfile('beep.mp3',
-                 temp_dir + '/beep.mp3')
-
-        self.history = []
-
-        self.load_node(node=self.current_database.nodes[0], retrace=False)
-
-    def show_database_info(self):
-        dialog = DatabaseDialog(self)
-        dialog.present()
-
-    def on_click_contents_btn(self, button):
-        self.load_node(node=self.current_database.nodes[0], retrace=True)
-
-    def on_click_index_btn(self, button):
-        if self.current_node.index:
-            self.load_node_by_path(self.current_node.index)
-
-        if self.current_database.index:
-            self.load_node_by_path(self.current_database.index)
-
-    def on_click_help_btn(self, button):
-        if self.current_node.help:
-            self.load_node_by_path(self.current_node.help)
-
-        if self.current_database.help:
-            self.load_node_by_path(self.current_database.help)
-
-    def on_click_retrace_btn(self, button):
-        if len(self.history) > 0:
-            self.load_node(self.history.pop(), retrace=False)
-
-    def on_click_browse_prev_btn(self, button):
-        if self.current_node.prev:
-            self.load_node_by_path(self.current_node.prev)
-
-    def on_click_browse_next_btn(self, button):
-        if self.current_node.next:
-            self.load_node_by_path(self.current_node.next)
-
-    def update_buttons(self, node):
-        if node.next:
-            next = True
-        else:
-            next = False
-
-        self.browse_next_btn.set_sensitive(next)
-
-        if node.prev:
-            prev = True
-        else:
-            prev = False
-
-        self.browse_prev_btn.set_sensitive(prev)
-
-        if node.toc:
-            toc = True
-        else:
-            toc = False
-
-        self.contents_btn.set_sensitive(toc)
-
-        if node.help:
-            help = True
-        else:
-            if self.current_database.help:
-                help = True
-            else:
-                help = False
-
-        self.contents_btn.set_sensitive(help)
-
-        if node.index:
-            index = True
-        else:
-            if self.current_database.index:
-                index = True
-            else:
-                index = False
-
-        self.contents_btn.set_sensitive(index)
-
-        if len(self.history) > 0:
-            history = True
-        else:
-            history = False
-
-        self.retrace_btn.set_sensitive(history)
+class MainWindow(QMainWindow):
 
     def load_node(self, node, line=0, retrace=True):
-        # TODO: Needs error handling!
-
-        self.webview.load_uri('file://' + temp_dir + '/' +
-                              self.current_database.database + '/' + node.name + '.html')
-
-        self.set_title(node.title)
-
-        font_family = 'font-family: ''' + self.current_database.font + ';'
-        font_size = 'font-size: ''' + \
-            str(self.current_database.font_size) + 'px;'
-        if self.current_database.wordwrap:
-            white_space = 'white-space: pre-wrap;'
-        else:
-            white_space = 'white-space: pre;'
-
-        self.webview.get_user_content_manager().add_style_sheet(WebKit2.UserStyleSheet(
-            'html {'
-            + font_family
-            + font_size
-            + white_space
-            + '}', injected_frames=WebKit2.UserContentInjectedFrames.ALL_FRAMES, level=WebKit2.UserStyleLevel.USER))
-
+        self.webEngineView.load(QUrl('file://' + temp_dir + '/' +
+                                     self.current_database.database + '/' + node.name + '.html'))
         if retrace:
             self.history.append(self.current_node)
 
         self.update_buttons(node)
 
         self.current_node = node
-
-        # self.webview.run_javascript('alert_box();')
 
         return True
 
@@ -699,7 +419,7 @@ class AppWindow(Gtk.ApplicationWindow):
 
             # Check if file exists (last chunk is main node, so ignore)
             file = self.base_dir + '/' + '/'.join(path_chunks[:-1])
-            if os.path.isfile(file):
+            if path.isfile(file):
                 # if path_chunks[-2].split(".")[-1] == "ilbm":
                 #     print("ilbm")
                 #     res = subprocess.check_output(["/usr/bin/ilbmtoppm", file, ">", "/tmp/test.ppm"], shell=True)
@@ -713,76 +433,203 @@ class AppWindow(Gtk.ApplicationWindow):
                 else:
                     return False
 
+    def __init__(self):
+        super().__init__()
 
-class Application(Gtk.Application):
-    def __init__(self, *args, **kwargs):
-        super().__init__(
-            *args,
-            application_id="org.example.areader",
-            **kwargs
-        )
-        self.window = None
+        self.setWindowTitle("AReader")
 
-    def do_startup(self):
-        Gtk.Application.do_startup(self)
+        # self.window.load_file()
+        self.resize(750, 600)
 
-        action = Gio.SimpleAction.new("open", None)
-        action.connect("activate", self.on_open)
-        self.add_action(action)
+        app.setOverrideCursor(QCursor(QPixmap('cursor_select.cur'), 0, 0))
 
-        action = Gio.SimpleAction.new("show_database_info", None)
-        action.connect("activate", self.on_database_info)
-        self.add_action(action)
+        self.databases = []
 
-        action = Gio.SimpleAction.new("about", None)
-        action.connect("activate", self.on_about)
-        self.add_action(action)
+        self.webEngineView = QWebEngineView()
+        # self.setCentralWidget(self.webEngineView)
 
-        action = Gio.SimpleAction.new("quit", None)
-        action.connect("activate", self.on_quit)
-        self.add_action(action)
+        self.contents_btn = QPushButton("Contents")
+        self.index_btn = QPushButton("Index")
+        self.help_btn = QPushButton('Help')
+        self.retrace_btn = QPushButton('Retrace')
+        self.browse_prev_btn = QPushButton('Browse <')
+        self.browse_next_btn = QPushButton('Browse >')
 
-        builder = Gtk.Builder()
-        builder.add_from_file("menu.xml")
+        self.contents_btn.clicked.connect(self.on_click_contents_btn)
+        self.index_btn.clicked.connect(self.on_click_index_btn)
+        self.help_btn.clicked.connect(self.on_click_help_btn)
+        self.retrace_btn.clicked.connect(self.on_click_retrace_btn)
+        self.browse_prev_btn.clicked.connect(self.on_click_browse_prev_btn)
+        self.browse_next_btn.clicked.connect(self.on_click_browse_next_btn)
 
-        self.set_menubar(builder.get_object("menubar"))
+        # width = 70
+        # height = 25
 
-    def do_activate(self):
-        if not self.window:
-            self.window = AppWindow(application=self, title="AReader")
+        hbox = QHBoxLayout(self)
+        hbox.addWidget(self.contents_btn)
+        hbox.addWidget(self.index_btn)
+        hbox.addWidget(self.help_btn)
+        hbox.addWidget(self.retrace_btn)
+        hbox.addWidget(self.browse_prev_btn)
+        hbox.addWidget(self.browse_next_btn)
 
-        self.window.present()
+        vbox = QVBoxLayout()
+        vbox.addLayout(hbox)
+        vbox.addWidget(self.webEngineView)
 
-    def on_open(self, action, param):
-        self.window.load_file()
+        widget = QWidget()
+        widget.setLayout(vbox)
+        self.setCentralWidget(widget)
 
-    def on_database_info(self, action, param):
-        self.window.show_database_info()
+        #filename = "amigaguide.guide"
 
-    def on_about(self, action, param):
-        about_dialog = Gtk.AboutDialog(transient_for=self.window, modal=True)
-        about_dialog.present()
+        filename = QFileDialog.getOpenFileName(
+            None, "Select an AmigaGuide file…", "./", filter="AmigaGuide files (*.guide)")[0]
 
-    def on_quit(self, action, param):
-        self.quit()
+        self.databases.append(Database())
+        self.current_database = self.databases[-1]
+        self.current_database.create_from_file(filename)
+
+        self.base_dir = filename[:filename.rfind(
+            '/')]
+
+        self.current_node = self.current_database.nodes[0]
+
+        # Copy some needed files (fonts, cursors, beep sound, etc)
+
+        copyfile('topaz_a1200_v1.0-webfont.woff2',
+                 temp_dir + '/topaz_a1200_v1.0-webfont.woff2')
+        copyfile('topaz_a1200_v1.0-webfont.woff',
+                 temp_dir + '/topaz_a1200_v1.0-webfont.woff')
+        copyfile('beep.mp3',
+                 temp_dir + '/beep.mp3')
+        copyfile('style.css',
+                 temp_dir + '/style.css')
+        copyfile('functions.js',
+                 temp_dir + '/functions.js')
+
+        self.history = []
+
+        self.load_node(node=self.current_database.nodes[0], retrace=False)
+
+        channel = QWebChannel(self.webEngineView)
+        self.webEngineView.page().setWebChannel(channel)
+
+        self.helper_bridge = Bridge()
+        channel.registerObject("bridge", self.helper_bridge)
+
+        self.webEngineView.loadFinished.connect(loadFinished)
+
+    def on_click_contents_btn(self):
+        self.load_node(node=self.current_database.nodes[0], retrace=True)
+
+    def on_click_index_btn(self):
+        if self.current_node.index:
+            self.load_node_by_path(self.current_node.index)
+
+        if self.current_database.index:
+            self.load_node_by_path(self.current_database.index)
+
+    def on_click_help_btn(self):
+        if self.current_node.help:
+            self.load_node_by_path(self.current_node.help)
+
+        if self.current_database.help:
+            self.load_node_by_path(self.current_database.help)
+
+    def on_click_retrace_btn(self):
+        if len(self.history) > 0:
+            self.load_node(self.history.pop(), retrace=False)
+
+    def on_click_browse_prev_btn(self):
+        if self.current_node.prev:
+            self.load_node_by_path(self.current_node.prev)
+
+    def on_click_browse_next_btn(self):
+        if self.current_node.next:
+            self.load_node_by_path(self.current_node.next)
+
+    def update_buttons(self, node):
+        if node.next:
+            enabled = True
+        else:
+            enabled = False
+
+        self.browse_next_btn.setEnabled(enabled)
+
+        if node.prev:
+            enabled = True
+        else:
+            enabled = False
+
+        self.browse_prev_btn.setEnabled(enabled)
+
+        if node.toc:
+            enabled = True
+        else:
+            enabled = False
+
+        self.contents_btn.setEnabled(enabled)
+
+        if node.help:
+            enabled = True
+        else:
+            if self.current_database.help:
+                enabled = True
+            else:
+                enabled = False
+
+        self.help_btn.setEnabled(enabled)
+
+        if node.index:
+            enabled = True
+        else:
+            if self.current_database.index:
+                enabled = True
+            else:
+                enabled = False
+
+        self.index_btn.setEnabled(enabled)
+
+        if len(self.history) > 0:
+            enabled = True
+        else:
+            enabled = False
+
+        self.retrace_btn.setEnabled(enabled)
 
 
-if __name__ == "__main__":
-    app = Application()
-    app.run(sys.argv)
+def loadFinished():
+    mainWin.setWindowTitle(mainWin.current_node.title)
 
-# TODO: Topaz font for menu buttons
-# TODO: Limit button style to buttons (not entire application)
-# TODO: Save last opened documents
-# TODO: Save last opened path
-# TODO: Maybe introduce subfolders with unique ids?
-# TODO: Implement tabstops
-# TODO: Tabs in documents not working correctly (arcdir.dopus5.guide)
-# TODO: Implement document width
-# TODO: Process line parameter for links
-# TODO: Find out how index and content actually work
-# TODO: Problems with retrace for external documents
-# TODO: Database info window
-# TODO: Highlight (last) selected links (manually color links? ("visited selector matches all element whose _href link already visited_."))
-# TODO: Rework temp files so they get deleted after program exit
-# TODO: Problems when loading the same document again
+    body_style = 'font-family: \"' + mainWin.current_database.font + '\"; \
+        font-size: ' + str(mainWin.current_database.font_size) + 'px;'
+
+    button_style = 'font-family: \"' + mainWin.current_database.font + '\";'
+
+    if mainWin.current_database.wordwrap:
+        body_style += 'white-space: pre-wrap;'
+    else:
+        body_style += 'white-space: pre;'
+
+    mainWin.webEngineView.page().runJavaScript(
+        "setStyle('body', '" + body_style + "');")
+    mainWin.webEngineView.page().runJavaScript(
+        "setStyle('button', '" + button_style + "');")
+
+
+class Bridge(QObject):
+    @Slot(str)
+    def button_clicked(self, data):
+        json_data = json.loads(data)
+        if "path" and "line" in json_data:
+            if not mainWin.load_node_by_path(json_data["path"], json_data["line"]):
+                print('Unable to open node: ' + json_data["path"])
+
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    mainWin = MainWindow()
+    mainWin.show()
+
+    sys.exit(app.exec())

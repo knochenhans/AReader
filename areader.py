@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 from os import error, replace, path
 from shutil import copyfile
+import shutil
 import sys
 import tempfile
 from tokenize import String
@@ -549,6 +550,10 @@ class MainWindow(QMainWindow):
         channel.registerObject("bridge", self.helper_bridge)
 
         self.webEngineView.loadFinished.connect(loadFinished)
+
+    def closeEvent(self, event):
+        temp.close()
+        shutil.rmtree(temp_dir)
 
     def on_click_contents_btn(self):
         self.load_node(node=self.current_database.nodes[0], retrace=True)

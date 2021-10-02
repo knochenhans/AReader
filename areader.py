@@ -458,15 +458,19 @@ class MainWindow(QMainWindow):
         self.browse_prev_btn = QPushButton('Browse <')
         self.browse_next_btn = QPushButton('Browse >')
 
+        self.contents_btn.setFixedSize(84, 22)
+        self.index_btn.setFixedSize(84, 22)
+        self.help_btn.setFixedSize(84, 22)
+        self.retrace_btn.setFixedSize(84, 22)
+        self.browse_prev_btn.setFixedSize(84, 22)
+        self.browse_next_btn.setFixedSize(84, 22)
+
         self.contents_btn.clicked.connect(self.on_click_contents_btn)
         self.index_btn.clicked.connect(self.on_click_index_btn)
         self.help_btn.clicked.connect(self.on_click_help_btn)
         self.retrace_btn.clicked.connect(self.on_click_retrace_btn)
         self.browse_prev_btn.clicked.connect(self.on_click_browse_prev_btn)
         self.browse_next_btn.clicked.connect(self.on_click_browse_next_btn)
-
-        # width = 70
-        # height = 25
 
         hbox = QHBoxLayout(self)
         hbox.setSpacing(2)
@@ -477,6 +481,7 @@ class MainWindow(QMainWindow):
         hbox.addWidget(self.retrace_btn)
         hbox.addWidget(self.browse_prev_btn)
         hbox.addWidget(self.browse_next_btn)
+        hbox.addStretch()
 
         vbox = QVBoxLayout()
         vbox.setSpacing(0)
@@ -516,6 +521,7 @@ class MainWindow(QMainWindow):
                  temp_dir + '/functions.js')
 
         QFontDatabase.addApplicationFont('Topaz_a1200_v1.0.ttf')
+
         self.setStyleSheet(
             "QPushButton { font-family: 'Topaz a600a1200a400'; \
                 font-size: 16px; \
@@ -523,12 +529,14 @@ class MainWindow(QMainWindow):
                 border-top: 2px solid white; \
                 border-right: 2px solid black; \
                 border-bottom: 2px solid black; \
-                border-left: 2px solid white; \
-                padding-left: 2px; \
-                padding-right: 2px; } \
+                border-left: 2px solid white; } \
                 QPushButton:disabled { color: black; \
-                    background-color: rgb(100, 100, 100) }; \
-                QMainWindow { background-color: rgb(170, 170, 170); }")
+                    background-color: rgb(100, 100, 100) }; ")
+        widget.setStyleSheet("background-color: rgb(170, 170, 170);")
+        # self.webEngineView.setStyleSheet(
+        # "QScrollBar { border: 5px solid red; }")
+
+        # widget.setStyleSheet("border: 3px dashed blue;")
 
         self.history = []
 
@@ -622,23 +630,24 @@ class MainWindow(QMainWindow):
 
 
 def loadFinished():
+    # Apply database page settings
     mainWin.setWindowTitle(mainWin.current_node.title)
 
-    body_style = 'font-family: \"' + mainWin.current_database.font + '\"; \
+    style = 'font-family: \"' + mainWin.current_database.font + '\"; \
         font-size: ' + str(mainWin.current_database.font_size) + 'px;'
 
-    button_style = 'font-family: \"' + mainWin.current_database.font + '\";'
-
     if mainWin.current_database.wordwrap:
-        body_style += 'white-space: pre-wrap;'
+        style += 'white-space: pre-wrap;'
     else:
-        body_style += 'white-space: pre;'
+        style += 'white-space: pre;'
 
     mainWin.webEngineView.page().runJavaScript(
-        "setStyle('body', '" + body_style + "');")
+        "setStyle('body', '" + style + "');")
     mainWin.webEngineView.page().runJavaScript(
-        "setStyle('button', '" + button_style + "');")
+        "setStyle('button', '" + style + "');")
 
+
+# Bridge for communication between Python and JavaScript of the page
 
 class Bridge(QObject):
     @Slot(str)

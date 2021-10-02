@@ -17,7 +17,6 @@ body {
 }
 
 button {
-  font-size: 100%;
   text-decoration: none;
   background-color: rgb(170, 170, 170);
   color: black;
@@ -112,3 +111,25 @@ button:active {
 p.node {}
 
 b {}
+
+/* body::-webkit-scrollbar {
+  background-color: #6688BB;
+  border-right: 2px solid black;
+  border-left: 2px solid white;
+  width: 50px;
+}
+
+body::-webkit-scrollbar-button {
+  border-top: 2px solid white;
+  border-right: 2px solid black;
+  border-bottom: 2px solid black;
+  border-left: 2px solid white;
+}
+
+body::-webkit-scrollbar-thumb {
+  border-top: 2px solid white;
+  border-right: 2px solid black;
+  border-bottom: 2px solid black;
+  border-left: 2px solid white;
+  width: 5px;
+} */

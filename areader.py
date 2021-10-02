@@ -1,12 +1,13 @@
 import json
-from os import error, mkdir, replace, path
+from pathlib import Path
+from os import error, replace, path
 from shutil import copyfile
 import sys
 import tempfile
 from tokenize import String
 import regex
 from PySide6.QtCore import QUrl, QObject, Slot
-from PySide6.QtGui import QIcon, QCursor, QPixmap
+from PySide6.QtGui import QIcon, QCursor, QPixmap, QFontDatabase, QFont
 from PySide6.QtWidgets import (QApplication, QLineEdit,
                                QMainWindow, QPushButton, QToolBar)
 from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -21,7 +22,8 @@ temp_dir = tempfile.mkdtemp()
 fonts = {
     "helvetica.font": "Helvetica",
     "courier.font": "Courier New",
-    "times.font": "Times New Roman"
+    "times.font": "Times New Roman",
+    "topaz": "Topaz"
 }
 
 
@@ -178,7 +180,7 @@ class Database:
 
         if chunks[0].lower() == 'font':
             self.font = fonts[chunks[1]]
-            self.font_size = int(chunks[2])
+            self.font_size = int(chunks[2]) + 5
 
         if chunks[0].lower() == 'rem' or chunks[0].lower() == 'remark':
             if len(chunks) > 1:
@@ -251,15 +253,16 @@ class Database:
                         ' ' + chunks[1].lower() + '>'
             # TODO: Implement quit script
             if chunks[1].lower() == 'close' or chunks[1].lower() == 'quit':
-                output = '<a href="javascript:quit()">' + chunks[0] + '</a>'
+                output = '<button type="button" onclick="quit();">' + \
+                    chunks[0] + '</button>'
         elif len(chunks) >= 2:
             if chunks[1].lower() == 'beep':
-                output = '<a href="javascript:beep()">' + \
-                    chunks[0] + '</a>'
+                output = '<button type="button" onclick="beep();">' + \
+                    chunks[0] + '</button>'
             # TODO: Do something with system commands
             if chunks[1].lower() == 'system':
-                output = '<a href="">' + \
-                    chunks[0] + '</a>'
+                output = '<button type="button">' + \
+                    chunks[0] + '</button>'
             if chunks[1].lower() == 'link':
                 if len(chunks) > 3:
                     line = int(chunks[3])
@@ -384,7 +387,7 @@ class Database:
             self.nodes[-1].text = self.replace_pseudo_tags(self.nodes[-1].text)
 
             # Create subfolder for database files
-            mkdir(temp_dir + "/" + self.database)
+            Path(temp_dir + "/" + self.database).mkdir(parents=False, exist_ok=True)
 
             # Write all nodes as html
             for node in self.nodes:
@@ -406,11 +409,11 @@ class MainWindow(QMainWindow):
 
         return True
 
-    def load_node_by_path(self, path, line=0):
-        path_chunks = path.split('/')
+    def load_node_by_path(self, node_path, line=0):
+        path_chunks = node_path.split('/')
         if len(path_chunks) == 1:
             # Simple internal link
-            node = self.current_database.find_node_by_path(path)
+            node = self.current_database.find_node_by_path(node_path)
 
             if node:
                 return self.load_node(node, line)
@@ -466,6 +469,8 @@ class MainWindow(QMainWindow):
         # height = 25
 
         hbox = QHBoxLayout(self)
+        hbox.setSpacing(2)
+        hbox.setContentsMargins(2, 2, 2, 2)
         hbox.addWidget(self.contents_btn)
         hbox.addWidget(self.index_btn)
         hbox.addWidget(self.help_btn)
@@ -474,6 +479,8 @@ class MainWindow(QMainWindow):
         hbox.addWidget(self.browse_next_btn)
 
         vbox = QVBoxLayout()
+        vbox.setSpacing(0)
+        vbox.setContentsMargins(0, 0, 0, 0)
         vbox.addLayout(hbox)
         vbox.addWidget(self.webEngineView)
 
@@ -507,6 +514,21 @@ class MainWindow(QMainWindow):
                  temp_dir + '/style.css')
         copyfile('functions.js',
                  temp_dir + '/functions.js')
+
+        QFontDatabase.addApplicationFont('Topaz_a1200_v1.0.ttf')
+        self.setStyleSheet(
+            "QPushButton { font-family: 'Topaz a600a1200a400'; \
+                font-size: 16px; \
+                background-color: rgb(170, 170, 170); \
+                border-top: 2px solid white; \
+                border-right: 2px solid black; \
+                border-bottom: 2px solid black; \
+                border-left: 2px solid white; \
+                padding-left: 2px; \
+                padding-right: 2px; } \
+                QPushButton:disabled { color: black; \
+                    background-color: rgb(100, 100, 100) }; \
+                QMainWindow { background-color: rgb(170, 170, 170); }")
 
         self.history = []
 
@@ -631,5 +653,4 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
     mainWin = MainWindow()
     mainWin.show()
-
     sys.exit(app.exec())

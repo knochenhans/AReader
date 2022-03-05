@@ -1,12 +1,8 @@
-document.querySelectorAll('a').forEach(item => {
-  item.addEventListener('click', event => {
-    // Send JSON message to application
-    window.webkit.messageHandlers.signal.postMessage(
-      { 'path': item.dataset.path, 'line': item.dataset.line });
-
-    // Keep href from being parsed
-    return false;
-  })
+window.addEventListener("load", function () {
+  new QWebChannel(qt.webChannelTransport, function (channel) {
+    var x = 0
+    document.bridge = channel.objects.bridge;
+  });
 });
 
 var beep_snd;
@@ -26,10 +22,11 @@ function beep() {
   }, 200);
 }
 
-// function set_font(font, font_size) {
-//   document.body.style.fontFamily = font;
-//   document.body.style.fontSize = font_size;
-// }
+function setStyle(elementName, string) {
+  for (i = 0; i < document.getElementsByTagName(elementName).length; i++) {
+    document.getElementsByTagName(elementName)[i].style.cssText = string
+  }
+}
 
 // function alert_box() {
 //   alert('bla');

@@ -1,10 +1,11 @@
 @font-face {
   font-family: 'topaz';
-  src: url('../topaz_a1200_v1.0-webfont.woff2') format('woff2'),
-    url('../topaz_a1200_v1.0-webfont.woff') format('woff');
+  src: url('topaz_a1200_v1.0-webfont.woff2') format('woff2'),
+    url('topaz_a1200_v1.0-webfont.woff') format('woff');
 }
 
 body {
+  /*font-family: 'topaz';*/
   background-color: rgb(170, 170, 170);
   color: black;
   line-height: 135%;
@@ -15,8 +16,9 @@ body {
   text-decoration: underline;
 }
 
-a {
+button {
   text-decoration: none;
+  background-color: rgb(170, 170, 170);
   color: black;
   border-top: 2px solid white;
   border-right: 2px solid black;
@@ -24,12 +26,18 @@ a {
   border-left: 2px solid white;
   padding-left: 2px;
   padding-right: 2px;
-  cursor: url('../cursor_select.cur'), auto;
 }
 
-a:visited,
-a:focus {
+button:visited,
+button:focus {
   background-color: #5078A0;
+}
+
+button:active {
+  border-top: 2px solid black;
+  border-right: 2px solid white;
+  border-bottom: 2px solid white;
+  border-left: 2px solid black;
 }
 
 .highlight {
@@ -103,3 +111,25 @@ a:focus {
 p.node {}
 
 b {}
+
+/* body::-webkit-scrollbar {
+  background-color: #6688BB;
+  border-right: 2px solid black;
+  border-left: 2px solid white;
+  width: 50px;
+}
+
+body::-webkit-scrollbar-button {
+  border-top: 2px solid white;
+  border-right: 2px solid black;
+  border-bottom: 2px solid black;
+  border-left: 2px solid white;
+}
+
+body::-webkit-scrollbar-thumb {
+  border-top: 2px solid white;
+  border-right: 2px solid black;
+  border-bottom: 2px solid black;
+  border-left: 2px solid white;
+  width: 5px;
+} */

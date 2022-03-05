@@ -500,6 +500,8 @@ class MainWindow(QMainWindow):
 
         widget = QWidget()
         widget.setLayout(vbox)
+        widget.setStyleSheet("background-color: rgb(170, 170, 170);")
+
         self.setCentralWidget(widget)
 
         self.appname = "AReader"

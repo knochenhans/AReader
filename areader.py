@@ -1,4 +1,6 @@
+import configparser
 import json
+import os
 from pathlib import Path
 from os import error, replace, path
 from shutil import copyfile
@@ -6,6 +8,7 @@ import shutil
 import sys
 import tempfile
 from tokenize import String
+from platformdirs import user_config_dir
 import regex
 from PySide6.QtCore import QUrl, QObject, Slot
 from PySide6.QtGui import QIcon, QCursor, QPixmap, QFontDatabase, QFont, QAction
@@ -499,9 +502,14 @@ class MainWindow(QMainWindow):
         widget.setLayout(vbox)
         self.setCentralWidget(widget)
 
+        self.appname = "AReader"
+        self.appauthor = "Andre Jonas"
 
+        self.config = configparser.ConfigParser()
 
+        self.load_config()
 
+        # self.load_file()
 
         channel = QWebChannel(self.webEngineView)
         self.webEngineView.page().setWebChannel(channel)
@@ -510,6 +518,25 @@ class MainWindow(QMainWindow):
         channel.registerObject("bridge", self.helper_bridge)
 
         self.webEngineView.loadFinished.connect(loadFinished)
+
+    def load_config(self) -> None:
+        self.config["window"] = {}
+        self.config["files"] = {}
+
+        if self.config.read(user_config_dir(self.appname) + '/config.ini'):
+            self.resize(int(self.config["window"]["width"]),
+                        int(self.config["window"]["height"]))
+
+    def save_config(self) -> None:
+        self.config["window"]["width"] = str(self.geometry().width())
+        self.config["window"]["height"] = str(self.geometry().height())
+
+        user_config_path = Path(user_config_dir(self.appname))
+        if not user_config_path.exists():
+            user_config_path.mkdir(parents=True)
+
+        with open(user_config_dir(self.appname) + "/config.ini", "w") as config_file:
+            self.config.write(config_file)
 
     def load_file(self):
         if self.config.has_option("files", "last_open_path"):
@@ -603,9 +630,11 @@ class MainWindow(QMainWindow):
             self.history = []
 
             self.load_node(node=self.current_database.nodes[0], retrace=False)
+
     def closeEvent(self, event):
         temp.close()
         shutil.rmtree(temp_dir)
+        self.save_config()
 
     def on_click_contents_btn(self):
         self.load_node(node=self.current_database.nodes[0], retrace=True)

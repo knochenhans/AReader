@@ -8,7 +8,7 @@ import tempfile
 from tokenize import String
 import regex
 from PySide6.QtCore import QUrl, QObject, Slot
-from PySide6.QtGui import QIcon, QCursor, QPixmap, QFontDatabase, QFont
+from PySide6.QtGui import QIcon, QCursor, QPixmap, QFontDatabase, QFont, QAction
 from PySide6.QtWidgets import (QApplication, QLineEdit,
                                QMainWindow, QPushButton, QToolBar)
 from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -442,6 +442,11 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle("AReader")
 
+        fileMenu = self.menuBar().addMenu("&File")
+        loadAction = QAction(
+            "Load…", self, shortcut="Ctrl+L", triggered=self.load_file)
+        fileMenu.addAction(loadAction)
+
         # self.window.load_file()
         self.resize(750, 600)
 
@@ -494,54 +499,9 @@ class MainWindow(QMainWindow):
         widget.setLayout(vbox)
         self.setCentralWidget(widget)
 
-        #filename = "amigaguide.guide"
 
-        filename = QFileDialog.getOpenFileName(
-            None, "Select an AmigaGuide file…", "./", filter="AmigaGuide files (*.guide)")[0]
 
-        self.databases.append(Database())
-        self.current_database = self.databases[-1]
-        self.current_database.create_from_file(filename)
 
-        self.base_dir = filename[:filename.rfind(
-            '/')]
-
-        self.current_node = self.current_database.nodes[0]
-
-        # Copy some needed files (fonts, cursors, beep sound, etc)
-
-        copyfile('topaz_a1200_v1.0-webfont.woff2',
-                 temp_dir + '/topaz_a1200_v1.0-webfont.woff2')
-        copyfile('topaz_a1200_v1.0-webfont.woff',
-                 temp_dir + '/topaz_a1200_v1.0-webfont.woff')
-        copyfile('beep.mp3',
-                 temp_dir + '/beep.mp3')
-        copyfile('style.css',
-                 temp_dir + '/style.css')
-        copyfile('functions.js',
-                 temp_dir + '/functions.js')
-
-        QFontDatabase.addApplicationFont('Topaz_a1200_v1.0.ttf')
-
-        self.setStyleSheet(
-            "QPushButton { font-family: 'Topaz a600a1200a400'; \
-                font-size: 16px; \
-                background-color: rgb(170, 170, 170); \
-                border-top: 2px solid white; \
-                border-right: 2px solid black; \
-                border-bottom: 2px solid black; \
-                border-left: 2px solid white; } \
-                QPushButton:disabled { color: black; \
-                    background-color: rgb(100, 100, 100) }; ")
-        widget.setStyleSheet("background-color: rgb(170, 170, 170);")
-        # self.webEngineView.setStyleSheet(
-        # "QScrollBar { border: 5px solid red; }")
-
-        # widget.setStyleSheet("border: 3px dashed blue;")
-
-        self.history = []
-
-        self.load_node(node=self.current_database.nodes[0], retrace=False)
 
         channel = QWebChannel(self.webEngineView)
         self.webEngineView.page().setWebChannel(channel)
@@ -551,6 +511,98 @@ class MainWindow(QMainWindow):
 
         self.webEngineView.loadFinished.connect(loadFinished)
 
+    def load_file(self):
+        if self.config.has_option("files", "last_open_path"):
+            last_open_path = self.config["files"]["last_open_path"]
+
+            filename = QFileDialog.getOpenFileName(
+                self, "Select an AmigaGuide file…", filter="AmigaGuide files (*.guide)", dir=last_open_path)[0]
+        else:
+            filename = QFileDialog.getOpenFileName(
+                self, "Select an AmigaGuide file…", filter="AmigaGuide files (*.guide)")[0]
+
+        if filename:
+            self.config["files"]["last_open_path"] = os.path.dirname(
+                os.path.abspath(filename))
+
+            self.databases.append(Database())
+            self.current_database = self.databases[-1]
+            self.current_database.create_from_file(filename)
+
+            self.base_dir = filename[:filename.rfind(
+                '/')]
+
+            self.current_node = self.current_database.nodes[0]
+
+            # Copy some needed files (fonts, cursors, beep sound, etc)
+
+            copyfile('topaz_a1200_v1.0-webfont.woff2',
+                     temp_dir + '/topaz_a1200_v1.0-webfont.woff2')
+            copyfile('topaz_a1200_v1.0-webfont.woff',
+                     temp_dir + '/topaz_a1200_v1.0-webfont.woff')
+            copyfile('beep.mp3',
+                     temp_dir + '/beep.mp3')
+            copyfile('style.css',
+                     temp_dir + '/style.css')
+            copyfile('functions.js',
+                     temp_dir + '/functions.js')
+
+            QFontDatabase.addApplicationFont('Topaz_a1200_v1.0.ttf')
+
+            button_style = "QPushButton:pressed { border-top: 2px solid black; \
+                    border-right: 2px solid white; \
+                    border-bottom: 2px solid white; \
+                    border-left: 2px solid black; } \
+                    QPushButton { font-family: 'Topaz a600a1200a400'; \
+                    font-size: 16px; \
+                    background-color: rgb(170, 170, 170); \
+                    border-top: 2px solid white; \
+                    border-right: 2px solid black; \
+                    border-bottom: 2px solid black; \
+                    border-left: 2px solid white; } \
+                    QPushButton:disabled { color: black; \
+                        background-color: rgb(100, 100, 100) }; "
+
+            self.contents_btn.setStyleSheet(button_style)
+            self.index_btn.setStyleSheet(button_style)
+            self.help_btn.setStyleSheet(button_style)
+            self.retrace_btn.setStyleSheet(button_style)
+            self.browse_prev_btn.setStyleSheet(button_style)
+            self.browse_next_btn.setStyleSheet(button_style)
+
+            # self.webEngineView.setStyleSheet(
+            # "QScrollBar { border: 5px solid red; }")
+
+            self.history = []
+
+            self.load_node(node=self.current_database.nodes[0], retrace=False)
+
+            if filename:
+                self.databases.append(Database())
+                self.current_database = self.databases[-1]
+                self.current_database.create_from_file(filename)
+
+                self.base_dir = filename[:filename.rfind(
+                    '/')]
+
+            self.current_node = self.current_database.nodes[0]
+
+            # Copy some needed files (fonts, cursors, beep sound)
+
+            copyfile('topaz_a1200_v1.0-webfont.woff2',
+                     temp_dir + '/topaz_a1200_v1.0-webfont.woff2')
+            copyfile('topaz_a1200_v1.0-webfont.woff',
+                     temp_dir + '/topaz_a1200_v1.0-webfont.woff')
+            copyfile('cursor_select.cur',
+                     temp_dir + '/cursor_select.cur')
+            copyfile('cursor_link.cur',
+                     temp_dir + '/cursor_link.cur')
+            copyfile('beep.mp3',
+                     temp_dir + '/beep.mp3')
+
+            self.history = []
+
+            self.load_node(node=self.current_database.nodes[0], retrace=False)
     def closeEvent(self, event):
         temp.close()
         shutil.rmtree(temp_dir)

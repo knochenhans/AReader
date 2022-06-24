@@ -312,7 +312,7 @@ class Database:
         return line
 
     def replace_pseudo_tags(self, text):
-        # TODO: This algorithm is a mess but it forks for now
+        # TODO: This algorithm is a mess but it works for now
         # Find pseudo tags like 'fg back' and replace with spans accordingly
 
         found = True
@@ -751,3 +751,16 @@ if __name__ == '__main__':
     mainWin = MainWindow()
     mainWin.show()
     sys.exit(app.exec())
+
+# TODO: Save last opened documents
+# TODO: Save last opened path
+# TODO: Maybe introduce subfolders with unique ids?
+# TODO: Implement tabstops
+# TODO: Tabs in documents not working correctly (arcdir.dopus5.guide)
+# TODO: Implement document width
+# TODO: Process line parameter for links
+# TODO: Find out how index and content actually work
+# TODO: Problems with retrace for external documents
+# TODO: Database info window
+# TODO: Highlight (last) selected links (manually color links? ("visited selector matches all element whose _href link already visited_."))
+# TODO: Problems when loading the same document again

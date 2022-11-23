@@ -1,21 +1,23 @@
 import configparser
 import json
 import os
-from pathlib import Path
-from os import path
-from shutil import copyfile
 import shutil
 import sys
 import tempfile
-from platformdirs import user_config_dir
+from os import path
+from pathlib import Path
+from shutil import copyfile
+
 import regex
-from PySide6.QtCore import QUrl, QObject, Slot
-from PySide6.QtGui import QIcon, QCursor, QPixmap, QFontDatabase, QFont, QAction
-from PySide6.QtWidgets import (QApplication, QLineEdit,
-                               QMainWindow, QPushButton, QToolBar)
-from PySide6.QtWebEngineWidgets import QWebEngineView
+from platformdirs import user_config_dir
+from PySide6.QtCore import QObject, QUrl, Slot
+from PySide6.QtGui import (QAction, QCursor, QFont, QFontDatabase, QIcon,
+                           QPixmap)
 from PySide6.QtWebChannel import QWebChannel
-from PySide6.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget, QFileDialog
+from PySide6.QtWebEngineWidgets import QWebEngineView
+from PySide6.QtWidgets import (QApplication, QFileDialog, QHBoxLayout,
+                               QLineEdit, QMainWindow, QPushButton, QToolBar,
+                               QVBoxLayout, QWidget)
 
 from database import Database
 

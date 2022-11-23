@@ -1,7 +1,7 @@
 import copy
-from enum import Enum, auto
 import re
 import string
+from enum import Enum, auto
 
 
 class TOKEN_TYPE(Enum):

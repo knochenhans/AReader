@@ -1,7 +1,9 @@
 from pathlib import Path
+
 import regex
+
+from lexer import TOKEN_TYPE, Lexer, Token
 from node import Node
-from lexer import Lexer, TOKEN_TYPE, Token
 
 fonts = {
     "helvetica.font": "Helvetica",

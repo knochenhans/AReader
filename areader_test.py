@@ -1,8 +1,9 @@
 import unittest
-from areader import Database
-from node import Node
-from lexer import *
 from textwrap import dedent
+
+from areader import Database
+from lexer import *
+from node import Node
 
 
 class DatabaseTests(unittest.TestCase):

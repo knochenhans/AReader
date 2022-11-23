@@ -1,5 +1,6 @@
 import unittest
-from areader import Database, Node
+from areader import Database
+from node import Node
 from lexer import *
 from textwrap import dedent
 

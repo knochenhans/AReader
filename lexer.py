@@ -32,9 +32,11 @@ Spec = [
     (r'^(\s+)', TOKEN_TYPE.WHITESPACE),
     (r'^(@)', TOKEN_TYPE.IDENTIFIER),
     (r'^([\{\}])', TOKEN_TYPE.SEPARATOR),
-    (r'^([a-zA-ZäÄöÖüÜß0-9\.-_]+\$?)', TOKEN_TYPE.IDENTIFIER),
+    (r'^(\d+(\.\d)?)', TOKEN_TYPE.NUMBER),
     (r'^"(.*?)"', TOKEN_TYPE.STRING),
     (r'^\'(.*?)\'', TOKEN_TYPE.STRING),
+    (r'^([a-zA-ZäÄöÖüÜß0-9\.\-_]+)', TOKEN_TYPE.IDENTIFIER),
+    (r'^(.*?)(?=\s)', TOKEN_TYPE.IDENTIFIER),
 ]
 
 
@@ -79,6 +81,9 @@ class Lexer():
     def init_string_token(self) -> Token:
         return Token(type=TOKEN_TYPE.STRING)
 
+    # def get_line(self) -> Token:
+    #     string = self.string[self.cursor:]
+
     def lex(self, string: str) -> list[Token]:
         self.string = string
 
@@ -88,36 +93,31 @@ class Lexer():
 
         last_pos = 0
 
+        # string = string.replace('<', '&lt;')
+        # string = string.replace('>', '&gt;')
+
         while True:
             if state == STATE.STRING:
-                pos = string.find('@', last_pos)
+                pattern = re.compile(r'(?<!\\)@')
 
-                if pos > 0:
-                    escape = True
+                match = pattern.search(string, last_pos)
 
-                    if string[pos - 1] != '\\':
-                        if re.match(r'\s', string[pos - 1]):
-                            escape = False
-                        if pos + 1 < len(string):
-                            if string[pos + 1] == '{':
-                                escape = False
-                        
-                    if escape:
-                        last_pos = pos + 1
-                        continue
+                if match:
+                    if match.start() > 0:
+                        if re.match(r'.@(?!{)', string[match.start() - 1:]):
+                            last_pos += 1
+                            continue
 
-                if pos >= 0:
+                    pos = match.start()
+
                     string_token.value += string[self.cursor:pos]
-                    state = STATE.COMMAND
-                else:
-                    string_token.value += string[self.cursor:]
 
                     if string_token.value:
                         tokens.append(string_token)
+                    state = STATE.COMMAND
+                else:
+                    # Not a real command, ignore
                     break
-
-                if string_token.value:
-                    tokens.append(string_token)
 
                 self.cursor += len(string_token.value)
             else:
